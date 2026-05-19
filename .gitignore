@@ -1,0 +1,200 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output/
+
+# Grunt intermediate storage
+.grunt/
+
+# Bower dependency directory
+bower_components/
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+*.node
+
+# Optional npm cache directory
+.npm/
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env*.local
+
+# parcel-bundler cache
+.cache/
+.parcel-cache/
+
+# Next.js build output
+.next/
+out/
+
+# Nuxt.js build output
+.nuxt/
+dist/
+
+# Gatsby files
+.cache/
+public/
+
+# VuePress build output
+.vuepress/dist/
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Expo/React Native
+.expo/
+web-build/
+*.expo
+*.expo.tar.gz
+web-build/
+.expo-shared/
+app.manifest
+
+# React Native
+android/app/build/
+android/.gradle/
+android/app/src/main/assets/
+ios/build/
+ios/Pods/
+*.xcworkspace
+*.xcodeproj
+*.xcuserstate
+ios/DerivedData/
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+android/gradlew
+android/local.properties
+android/**/*.apk
+android/**/*.ap_
+android/**/*.aab
+android/**/*.jar
+android/**/*.war
+android/**/*.ear
+android/**/*.zip
+android/**/*.tar
+
+# iOS
+ios/.symlinks/
+ios/Pods/
+ios/Podfile.lock
+ios/*.xcworkspace
+ios/*.xcodeproj
+ios/DerivedData/
+ios/fastlane/report.xml
+ios/fastlane/README.md
+ios/fastlane/screenshots/
+ios/fastlane/test_output/
+ios/fastlane/README.md
+
+# Electron
+electron-builder.cache/
+*.dmg
+*.dmg.blockmap
+*.exe
+*.exe.blockmap
+*.nsis
+*.nsis.blockmap
+
+# Supabase
+.supabase/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup

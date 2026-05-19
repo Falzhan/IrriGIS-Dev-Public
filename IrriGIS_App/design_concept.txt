@@ -1,0 +1,283 @@
+Mobile App Design Concepts:
+
+Global Theme & Styling
+Background Color: Light Sage Green (approx. #E0EBE2)
+
+Bottom Navigation/Footer Background: Grass Green (approx. #9BB88D)
+
+Primary Accent (Buttons/Toggles): Muted Teal/Blue (approx. #74A5A8)
+
+Card Background: Pure White (#FFFFFF)
+
+Text Colors: Dark Charcoal/Black for primary text, Medium Gray for secondary text/timestamps.
+
+Status Badges:
+* "In Progress": Bright Mint Green text and background (approx. #2BD586)
+* "Pending": Sky Blue text and background (approx. #5DADE2)
+
+Border Radius: Highly rounded corners on cards, chips, and buttons (approx. 12px to 16px).
+
+Camera Overlay: Translucent Black (rgba(0,0,0,0.6))
+
+Rating Toggles (Unselected): Very pale lavender/blue border and text (approx. #E6E6FA)
+
+Rating Toggles (Selected): Deep Lavender/Indigo background (approx. #7B61FF) with white text.
+
+Text Input Background: White with a subtle gray border (#CCCCCC).
+
+Camera Overlays: standard View with position="absolute".
+
+Rating Scales (1-5): A custom component utilizing a flex-row of TouchableRipple or custom styled Button components to create the circular toggles.
+
+Remarks Input: TextInput (with multiline={true}, mode="outlined").
+
+Help Overlay (Quick Guide): Portal and Modal (or Dialog) components.
+
+The Animation: use react-native-reanimated or React Native's built-in Animated API for the Bottom Tab Bar transition.
+
+
+
+Component Mapping (React Native Paper)
+Use these specific react-native-paper components:
+
+Top Bar: Appbar.Header, Appbar.Action
+
+Top Toggle Switch: SegmentedButtons
+
+Status Pills/Badges: Chip (with customized heights and border radii)
+
+Feed Items: Card, Card.Content (flex row layout)
+
+Typography: Text (using variant="titleMedium", bodySmall, etc.)
+
+Sidebar/Drawer: Drawer.Section, Drawer.Item, Avatar.Image
+
+Dropdown/Collapsible Lists: List.AccordionGroup, List.Accordion, List.Item
+
+
+Screen-by-Screen Breakdown
+
+Important!!: Bottom Navigation Bar:
+* Grass Green background.
+* Three evenly spaced icons:
+  * Left: "Reports" (File/Tray icon, currently active).
+  * Center: Camera icon.
+  * Right: Map icon.
+
+!!! I. Main Report Feed (Home: Left: "Reports")
+
+Screen 1: 
+
+Top App Bar:
+* Left: Hamburger menu icon.
+* Center: A SegmentedButtons component with two options: "Reports" (active, Teal background, white text, paper plane icon) and "Me" (inactive, transparent background, dark text, user profile icon).
+* Right: Calendar icon (Appbar.Action).
+
+Main Content Area (ScrollView):
+* A vertical list of Card components with white backgrounds and drop shadows.
+
+Card Layout: Flex-row.
+
+Left side:
+* A square thumbnail image of the field issue with rounded corners.
+
+Right side (Flex column):
+* Title text (e.g., "Debris", "Silt", "Water Level") in bold.
+* Subtitle text (e.g., "Manageable Debris", "Dry").
+* Location text (e.g., "Purok 3, Brgy. Katangawan") in small, gray font.
+* Date/Time text in small, gray font.
+* Bottom right alignment: A Chip showing the status (e.g., "In Progress" in green).
+
+
+
+Screen 2: Navigation Drawer (Sidebar)
+
+Layout:
+* Slides in from the left, taking up about 70% of the screen width.
+* White background.
+
+Header Section:
+* Large Avatar.Image of the user.
+* User Name in bold text ("Jobit Mindosa").
+* User Role in smaller, gray text ("KASAF IA - Member").
+* A horizontal divider line.
+
+Menu Items (using Drawer.Item or custom List.Item):
+* "All Reports" (File tray icon)
+* "My Reports" (Paper plane icon)
+* "Closed Reports" (Archive/Box icon)
+* "Geo Camera" (Camera icon)
+* "GIS Map" (Map icon)
+
+Footer Section:
+* A horizontal divider line at the bottom.
+* "Settings" (Gear icon).
+* "Log Out" (Exit/Door icon).
+
+
+Screen 3: Filtered / Accordion View
+
+Top App Bar:
+* Identical to Screen 1.
+
+Main Content Area:
+* Uses List.Accordion to group reports by status.
+
+Section 1:
+* "Pending (1)" - Currently expanded, showing an arrow pointing up.
+* Inside is a standard report Card (same layout as Screen 1) but with a Blue "Pending" Chip.
+
+Section 2:
+* "In Progress (0)" - Collapsed, arrow pointing down.
+* Divider line below it.
+
+Section 3:
+* "Closed (0)" - Collapsed, arrow pointing down.
+* Divider line below it.
+
+Bottom Navigation Bar:
+* Identical to Screen 1.
+
+
+Screen 4: Detailed Ticket View
+
+Top Half (Hero Image):
+* A full-width, edge-to-edge image of the reported issue.
+* Overlaying the image at the top left is a hamburger menu (or back button).
+* Overlaying the image at the bottom is white text showing the Date/Time and exact GPS Coordinates (with a tiny crosshair icon).
+
+Bottom Half (Details Sheet):
+* A white container that slightly overlaps the bottom of the hero image, featuring rounded top corners.
+
+Header Row:
+* Title ("Debris") on the left.
+* "Pending" Blue Chip on the right.
+
+Subtitle:
+* ("Slightly Obstructed") below the title.
+
+Date/Time and Location:
+* Aligned to the right.
+
+Submitter Info:
+* Text saying "Submitted by:"
+* Followed by a flex-row with the user's Avatar.Image, Name, and Role.
+* Horizontal divider line below this.
+
+Timeline / Tracker (Custom Layout):
+* Left column: Date and Time ("Dec 12, 2024 \n 3:45 PM").
+* Middle column: A vertical line with dots (nodes) representing steps. The active node is blue, inactive nodes are gray.
+* Right column: Step titles and descriptions (e.g., "Report Submitted \n Debris Level: 4 Significant Blockage" and "Pending \n NIA Acknowledgement").
+
+Bottom Navigation Bar:
+* Identical to Screen 1.
+
+
+!!!  II. Center: Camera icon
+1. The Geo-Camera View & Navigation Animation
+
+The Core Animation Logic:
+
+Trigger:
+* When the user clicks the center "Camera" icon on the standard green bottom navigation bar.
+
+Action:
+* The green background transitions to black.
+* The center Camera icon physically translates (moves up on the Y-axis) and scales up to become the large, central Shutter button.
+
+Replacement:
+* As the camera icon rises, it leaves an empty space in the center of the navigation bar.
+* That space fades in a new icon: a "Pencil/Form" icon.
+
+State Result:
+* The user is now in "Camera Mode".
+* The bottom nav is black.
+* Left is "Reports", Center is "Form" (inactive), Right is "Map".
+* Above the center icon floats the giant white Shutter button.
+
+Camera UI Overlays:
+
+Top Bar:
+* Absolute positioned translucent black row.
+* Contains three white icons evenly spaced: Flash (lightning), Timer (clock), and Grid (hash).
+
+Viewfinder:
+* Full screen.
+* Has a subtle white grid overlay (rule of thirds).
+
+Geo-Tag Watermark:
+* Absolute positioned at the bottom-left of the viewfinder, just above the shutter controls.
+* It is a translucent dark box containing the Date, Time, Location Name, and precise GPS coordinates with a tiny crosshair icon.
+
+Shutter Area:
+* A black block at the bottom containing the floating white shutter button.
+* To the right of the shutter button is a smaller camera-flip icon.
+
+
+
+2. The Prompt Form (Bottom Sheet)
+
+Trigger:
+* Clicking the shutter button takes the photo, shrinks the camera view to the top third of the screen, and slides up a white form container from the bottom.
+
+Header Row:
+* Contains a "Presets" dropdown menu on the right, next to a circular "?" (Help) icon.
+
+Rating Sections (Water Level, Silt Level, Debris Level):
+* Each section has a bold title.
+* Below the title is a flex-row of 5 circular buttons (labeled 1 through 5).
+
+State:
+* When unselected, circles have a thin purple border and purple text.
+* When selected, the circle fills with solid purple and the text becomes white.
+
+Labels:
+* Directly beneath each number is a micro-copy label (e.g., under Water Level 1: "Dry", under 3: "Normal").
+
+Remarks Section:
+* Title: "Remarks".
+* A large, outlined multiline TextInput area for user notes.
+
+Submit Button:
+* A floating, pill-shaped teal button that sits at the bottom center of the form, slightly overlapping the bottom navigation bar.
+
+Bottom Navigation Bar (Form State):
+* Reverts to the Grass Green background.
+* The center "Pencil/Form" icon is now active, surrounded by a large blue pill-shaped highlight with the text "Form" below it.
+
+
+
+3. The Quick Guide (Modal Overlay)
+
+Trigger:
+* Clicking the "?" icon in the form header.
+
+Layout:
+* A large white Modal that covers most of the screen, darkening/blurring the form behind it.
+* Highly rounded corners.
+
+Header:
+* Bold "Quick Guide" title with a subtitle: "Select the rating based on your observation of the canal's state."
+
+Data Matrix (The core content):
+* A 4-column layout.
+  * Column 1: The Number (1-5) inside a solid purple circle.
+  * Column 2: Water Level description.
+  * Column 3: Silt Level description.
+  * Column 4: Debris Level description.
+
+Example Row 1:
+* (1) | Dry (No water) | Clean (No silt) | Clear (No obstruction).
+
+This matrix uses light horizontal and vertical divider lines for readability.
+
+Footer (Presets Guide):
+* Title: "Presets"
+* Explains automated preset groupings like "Cleaning" (documenting maintenance) and "Severe" (all parameters set to 5).
+
+
+
+
+!!! III. Right: Map icon
+
+Geofenced super zoomed in map of the IA if an IA member. Base on the user details. 

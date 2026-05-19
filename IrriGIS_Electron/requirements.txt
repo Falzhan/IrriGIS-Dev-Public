@@ -1,0 +1,5 @@
+npm install express cors helmet morgan
+npm install pg pg-hstore sequelize
+npm install bcryptjs jsonwebtoken
+npm install multer sharp
+npm install dotenv

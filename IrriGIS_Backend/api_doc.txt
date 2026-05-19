@@ -1,0 +1,138 @@
+IrriGIS Backend - Complete API Documentation
+Base URL
+http://localhost:3000/api
+---
+Authentication (/api/auth)
+Method	Endpoint	Description	Auth	Body/Params
+POST	/auth/login	Email/password login	No	email, password
+POST	/auth/register	User registration	No	email, password, first_name, last_name, role, address
+GET	/auth/google	Google OAuth redirect	No	-
+GET	/auth/google/callback	Google OAuth callback	No	-
+GET	/auth/facebook	Facebook OAuth redirect	No	-
+GET	/auth/facebook/callback	Facebook OAuth callback	No	-
+GET	/auth/failure	OAuth failure handler	No	-
+GET	/auth/test	Test protected route	Yes (JWT)	-
+---
+Reports (/api/reports)
+Method	Endpoint	Description	Auth	Body/Params
+GET	/reports	Get all reports (paginated)	Yes	page, limit, ris_id, ia_id, category, status
+POST	/reports	Create new report	Yes	category, water_level, silt_level, debris_level, remarks, latitude, longitude, images (up to 5)
+GET	/reports/:id	Get single report	Yes	-
+PUT	/reports/:id	Update report	Yes	Same as POST
+DELETE	/reports/:id	Delete report	Yes (nia_admin only)	-
+---
+Tickets (/api/tickets)
+Method	Endpoint	Description	Auth	Body/Params
+GET	/tickets	Get all tickets	Yes	page, limit, status, assigned_to
+GET	/tickets/:id	Get single ticket	Yes	-
+POST	/tickets	Create ticket manually	Yes (nia_admin only)	report_id, status, assigned_to
+PUT	/tickets/:id	Update ticket status	Yes	status, assigned_to, workflow_steps
+POST	/tickets/:id/comments	Add comment	Yes	comment, is_internal
+DELETE	/tickets/:id	Delete ticket	Yes (nia_admin only)	-
+---
+Users (/api/users)
+Method	Endpoint	Description	Auth	Body/Params
+GET	/users	Get all users	Yes (nia_admin only)	page, limit, role, is_active, ia_id, search, sort, order
+GET	/users/me	Get current user	Yes	-
+GET	/users/:id	Get user by ID	Yes	-
+GET	/users/ias	Get irrigator associations list	Yes	-
+POST	/users	Create new user	Yes (nia_admin only)	email, password, first_name, last_name, role, contact_number, address, ia_id
+PUT	/users/:id	Update user	Yes	first_name, last_name, contact_number, address, role, ia_id, is_active
+PUT	/users/:id/password	Reset user password	Yes (nia_admin only)	new_password
+DELETE	/users/:id	Deactivate user	Yes (nia_admin only)	-
+---
+GIS (/api/gis)
+Method	Endpoint	Description	Auth	Query Params
+GET	/gis/reports	Get reports as GeoJSON	Yes	status, ris_id, ia_id, category, urgency, date_from, date_to, bounds, page, limit
+GET	/gis/features	Get canal/river features as GeoJSON	Yes	ris_id, ia_id, feature_type
+GET	/gis/ris	Get all RIS list	Yes	with_stats
+GET	/gis/ris/:id	Get single RIS details	Yes	include_layers
+GET	/gis/stats	Get aggregated statistics	Yes (nia_admin, nia_field_officer)	ris_id, ia_id, date_from, date_to
+GET	/gis/ias	Get irrigator associations	Yes	ris_id
+---
+Query Parameters Reference
+Reports & Tickets
+Parameter	Values	Description
+status	pending, in_progress, closed	Filter by ticket status
+ris_id	UUID	Filter by River Irrigation System
+ia_id	UUID	Filter by Irrigator Association
+category	inspection, maintenance, cleaning, issue, other	Filter by report category
+role	nia_admin, nia_field_officer, ia_admin, ia_member	Filter by user role
+is_active	true, false	Filter active/inactive users
+search	string	Search in name/email
+page	number	Page number (default: 1)
+limit	number	Items per page (default: 20)
+sort	string	Sort field (default: createdAt)
+order	ASC, DESC	Sort order
+GIS
+Parameter	Values	Description
+status	pending, in_progress, closed	Filter reports by status
+ris_id	UUID	Filter by RIS
+ia_id	UUID	Filter by IA
+category	report category	Filter by category
+urgency	high, normal	Filter by urgency score (high = score >= 12)
+feature_type	canal, river, main_canal, pipeline, lateral, farm_ditch	Filter GIS features
+bounds	minLng,minLat,maxLng,maxLat	Filter by map viewport
+date_from	ISO date	Filter from date
+date_to	ISO date	Filter to date
+with_stats	true	Include RIS statistics
+include_layers	true	Include canals, reports, IAs in response
+---
+User Roles
+Role	Access Level
+nia_admin	Full access to all endpoints
+nia_field_officer	Full read access, limited write
+ia_admin	Limited to own IA data
+ia_member	Limited to own reports/tickets
+---
+Example: Authentication Flow
+# 1. Login
+POST /api/auth/login
+Body: { "email": "admin@nia.gov.ph", "password": "password123" }
+# Response:
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1..."
+}
+# 2. Use token for protected endpoints
+GET /api/reports
+Header: Authorization: Bearer eyJhbGciOiJIUzI1...
+---
+Example: Create Report with Images
+POST /api/reports
+Content-Type: multipart/form-data
+Authorization: Bearer TOKEN
+Fields:
+- category: "issue"
+- water_level: "high"
+- silt_level: "dirty"
+- debris_level: "blocked"
+- remarks: "Canal overflow near Sector 3"
+- latitude: "6.123456"
+- longitude: "125.123456"
+- images: [file1.jpg, file2.jpg] (max 5)
+---
+Example: GIS GeoJSON Response
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [125.123, 6.456]
+      },
+      "properties": {
+        "id": "uuid",
+        "water_level": "high",
+        "silt_level": "dirty",
+        "debris_level": "blocked",
+        "status": "in_progress",
+        "urgency_score": 14,
+        "created_at": "2026-03-29",
+        "reporter": { "name": "Juan Dela Cruz" },
+        "images": ["/uploads/image.jpg"]
+      }
+    }
+  ]
+}

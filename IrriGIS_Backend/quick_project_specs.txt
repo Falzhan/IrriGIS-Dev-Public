@@ -1,0 +1,163 @@
+3.2.3 Identify System Features:
+The System features were determined based on gathered data to ensure
+that it aligns with the project objectives. The features of IrriGIS: Geographic
+Information System-Based Irrigation Canal Monitoring and Reporting Platform
+for the NIA and IAs in General Santos City are the following:
+
+
+(Mobile Application)
+
+1. Accounts
+Provides secure access to the mobile application through email-
+password authentication, as well as Facebook or Google account login
+options. Users using NIA institutional email are granted unlimited
+access, while non-NIA users, the members of Irrigators Associations
+(IAs), are prompted to provide their address during registration. This
+information is used to assign them to their respective Irrigators
+Association. Accounts enable role-based permissions, granting users
+different levels of access based on their designated roles within the
+system.
+2. Geo-Camera with Prompt Report Form
+Enables users to capture geo-tagged photos alongside a brief
+report form to input image description of an activity performed on the
+canal or a report of the canal’s status. Users can input descriptions based
+on parameters such as water level, water flow, silt level, and debris.
+The report form uses a descriptive rating scale to assess three key
+parameters: water level, silt level, and debris level, each rated from 1 to
+5. Water level refers to the height of water in the canal, ranging from 1-
+31
+Dry (no water) to 2-Low (below normal), 3-Normal (ideal operating
+level), 4-High (close to overflow), and 5-Overflow (overflowing beyond
+capacity). Silt level evaluates sediment buildup, with 1-Clean (no
+sediment), 2-Light (minimal accumulation), 3-Normal (moderate
+sediment typical for operation), 4-Dirty (substantial accumulation), and
+5-Heavily Silted (critical levels impeding flow). Debris level measures
+obstructions from waste or natural materials, starting at 1-Clear (no
+obstruction), 2-Light (minimal debris), 3-Normal (manageable debris),
+4-Heavy (significant blockage), and 5-Blocked (severe obstruction
+preventing flow). The selection of a parameter rating is left to the user's
+discretion, allowing them to evaluate and report conditions based on
+their observation. Additionally, there are presets available. With the
+default preset, putting all parameters to 3-Normal. Cleaning preset for
+when documenting maintenance and cleaning activities, automatically
+setting the Silt & Debris level parameters to 1 for clean and clear. Severe
+preset, for when all parameters are set to 5 - Overflow, Heavily Silted,
+and Blocked. An additional field for inputting remarks is also provided.
+The data will then be sent, organized, and displayed to the report ticket
+system.
+3. Integrated Report Ticket System
+Provides a simplified interface for users to view submitted
+reports. The system organizes reports, displaying essential information
+such as the submission date, time, location, and a brief description.
+Users can track the status of their tickets, as the progress are being
+displayed in a timeline. The status progress includes “Pending” where
+32
+report submissions are awaiting acknowledgment from the admins, “In
+Progress” where the report is now acknowledged by the admins and is
+awaiting actions from the admin, and “Closed” where the ticket is closed
+as it is now resolved. Comments are available for tickets marked as “In
+Progress”, providing additional details about ongoing actions.
+Additionally, users can update and edit their own submitted reports.
+Using the coordinates and details from the geo-tagged images, the data
+is also displayed on the GIS Map.
+4. Integrated GIS Map
+Serves as the core visualization platform, displaying data derived
+from the reports. Includes specific interactive maps of irrigation canal
+networks overseen by different IAs under the Sarangani-General Santos
+- South Cotabato Irrigation Management Office (SCSIMO). The chosen
+map to be displayed is specified depending on the user account, where
+IAs are geo-fenced depending on their assigned location while NIA
+officers have the ability to choose map depending on their current
+location. The map displays canal statuses, maintenance activities, and
+flagged issues, with geo-tagged photos and metadata displayed through
+clickable points. However, the map only displays reports marked as “In
+Progress”. The interface provides legends, a brief explanation of the
+meaning of the symbols, colors, and styles used on the map.
+5. Notifications
+Keeps users informed about updates and actions related to their
+submitted reports and system activity. Notifications are delivered
+including alerts for status changes in the Integrated Report Ticket
+System, such as when a report transitions from Pending to In Progress
+or when additional comments are added.
+
+
+
+(Web GIS – Admin Dashboard)
+
+1. Accounts
+Provide admins secure access to the web application through email-
+password authentication. Users using NIA institutional email are granted
+full access, while non-NIA users, the assigned admins of Irrigators
+Associations (IAs), have limited access.
+2. Exploded GIS Map
+Provides administrators with an advanced and detailed view of the
+irrigation canal network by overlaying data layers specific to maintenance
+activities, flagged issues, and canal statuses. Unlike the mobile version, the
+exploded GIS map allows for multi-layer viewing, enabling the display of
+overlapping data sets such as water levels, debris accumulation, and
+structural integrity. Administrators can filter layers to isolate specific data
+types or focus on particular canal segments. Geo-tagged photos submitted
+from the mobile application are linked to corresponding map points,
+allowing admins to view associated metadata and reports.
+3. Report Ticket System
+The Report Ticket System equips administrators with tools to efficiently
+manage and resolve reports submitted through the mobile application.
+Reports are displayed in a detailed tabular format, including submission
+date, reporter information, location, and ticket status. Administrators can
+sort and filter tickets based on urgency, category, or location, ensuring
+efficient prioritization. The system supports expanded ticket statuses,
+including Pending, In Progress, and Closed, with each status accompanied
+by a timeline logging updates and actions taken.
+When the report submitted from the mobile application is received, it is
+initially assigned the “Pending” status, where administrators review and
+acknowledge the received submission. Once acknowledged, the report is
+marked as In Progress, and administrators take charge of coordinating
+necessary actions to address the issue. This may involve dispatching
+equipment, approving financial assistance, or deploying additional labor
+resources to the affected site. Administrators actively monitor the progress
+of each ticket, updating the system with detailed logs of the actions taken to
+maintain transparency and accountability.
+Finally, the report is marked as Closed once all required actions are
+completed and the issue is resolved. Administrators ensure thorough
+documentation at each stage, facilitating systematic management of tickets
+and providing a clear record of resolutions for future reference. This
+structured approach allows administrators to maintain oversight and
+efficiently manage the lifecycle of all reports.
+4. History
+Serves as a comprehensive database that organizes all past recorded
+activities and closed reports related to the irrigation canals. Administrators
+can access detailed documentation of geo-tagged submissions, including
+metadata such as date, time, location, and user details. Historical trends and
+recurring patterns, such as frequent issues in specific locations, are
+highlighted through graphical summaries.
+5. Secure User Management System
+Manages user accounts and their associated roles, ensuring secure access
+and role-specific permissions for both mobile and web platforms.
+Administrators can add, edit, or deactivate accounts, assigning roles such as
+IA Members and NIA Field Officers for the monitoring role, or NIA Admins
+for the administrator role, each with predefined access levels and privileges.
+6. Notifications
+Provides administrators and personnel with a centralized system for
+receiving alerts and updates related to the irrigation network and submitted
+reports. Notifications include alerts for reports from the mobile application.
+
+
+3.4.1 Software Requirements Specification:
+Windows
+Android
+Visual Studio Code
+NodeJS with Express
+React Native
+Expo
+PostgreSQL
+QGIS
+OpenStreet API
+GeoServer
+Oracle Cloud
+Google Sign-in API
+Facebook Login API
+Electron Framework
+
+
+
+

@@ -1,0 +1,238 @@
+================================================================================
+                        IrriGIS Mobile App - Progress Report
+================================================================================
+Last Updated: 2026-05-18
+App Version: v1.2.6 (Expo/React Native)
+Backend API: https://irrigis-backend.onrender.com/api (or configurable via EXPO_PUBLIC_API_URL)
+
+===============================================================================
+RECENT UPDATES (v1.2.6)
+===============================================================================
+[x] Draft / Offline Report System (NEW)
+    - photo capture + auto-save draft at the moment photo is taken
+    - draft saved to local pending_reports.json before any submit attempt
+    - Tap "Submit" while online → draft deleted from local and report sent to server
+    - Tap "Submit" while offline → draft stays, reports appear in Me tab, auto-sync later
+    - Tap ✕ / Retake on form → in-flight draft silently deleted
+    - App crash / force-close while form is open → draft survives restart and appears in Me tab
+
+[x] Drafts Listed on the Me Tab
+    - app/(tabs)/index.tsx: loadDrafts() via useFocusEffect on HomeScreen
+    - Draft cards prepended before every server report/ticket in Me view
+    - Sorted newest-first (pending_reports.json push order)
+    - Grayed-out card style (opacity 0.82, bg #f0f0f0) with gray "DRAFT" badge on thumbnail
+    - Gray "Draft" status pill to distinguish from server-backed items
+
+[x] Resume from Draft (Me tab → Camera form)
+    - Tapping a draft card opens camera page with ?draft=<local_id> query param
+    - app/(tabs)/camera.tsx: useFocusEffect rehydrates all form fields
+      (image, water/silt/debris levels, category, remarks, GIS feature, submission type)
+    - currentDraftId tracked in state so submit can remove the right draft
+
+[x] Delete Draft
+    - Trash-icon button (red, absolute top-right) on every draft card
+    - stopPropagation so it doesn't also open the camera
+    - Calls deletePendingReport(draftId) from offlineStorage.js
+
+[x] Implemented Offline Storage System (v1.2.4)
+    - services/offlineStorage.js - File-based storage using modern expo-file-system API
+    - hooks/useOfflineSync.js - React hook for offline sync management
+    - Deferred report submission when offline (auto-saves to local)
+    - Auto-sync queue when network connection is restored
+[x] Custom Bottom Navigation Bar (v1.2.2)
+    - Floating design with 30px rounded top corners
+    - Three tabs: Reports, Camera, Map
+[x] Camera Mode Animation (v1.2.2)
+    - Background transitions from green (#9BB88D) to black (#111111)/login
+    - Large white shutter button with glow effect
+[x] Refactored Navigation Structure (v1.2.2)
+    - Moved my-reports.tsx, profile.tsx, notifications.tsx from (tabs) to (profile) group
+
+================================================================================
+PART 1: Current File Structure
+================================================================================
+
+IrriGIS_App/
+├── app/
+│   ├── _layout.tsx                 # Root layout with auth routing, PaperProvider, NotificationProvider
+│   ├── +not-found.tsx              # 404 fallback screen
+│   ├── (auth)/
+│   │   ├── _layout.tsx             # Auth group layout
+│   │   └── index.tsx               # Login/Register screen with OAuth, IA address assignment
+│   ├── (tabs)/
+│   │   ├── _layout.tsx             # Tab navigation with custom bottom nav
+│   │   ├── index.tsx              # Home screen with offline data support
+│   │   ├── camera.tsx             # Report creation with camera, offline submission
+│   │   ├── map.tsx                # MapView showing ONLY "In Progress" reports
+│   │   ├── image-gallery.tsx     # Full-screen image viewer
+│   │   └── ticket/
+│   │       ├── _layout.tsx        # Stack layout for personal ticket detail
+│   │       └── [id].tsx           # Read-only ticket progress, comments for In Progress tickets only
+│   └── (profile)/                  # Profile group (moved from tabs)
+│       ├── _layout.tsx            # Profile group layout
+│       ├── index.tsx             # Redirect to profile.tsx
+│       ├── profile.tsx           # User profile, role display, navigation to my-reports/notifications
+│       ├── my-reports.tsx        # User's own submitted reports, timeline tracking
+│       └── notifications.tsx     # Push/polling notifications for report status changes
+├── components/
+│   ├── CustomBottomNav.tsx        # Custom bottom navigation with camera mode animation
+│   ├── CustomSidebar.tsx          # Animated slide-in sidebar with backdrop fade
+│   ├── CustomTopNav.tsx           # Top navigation with NotificationBell integration
+│   ├── DraggableBottomSheet.tsx   # Bottom sheet for ticket/report details
+│   └── NotificationBell.tsx       # Notification bell with badge and dropdown modal
+├── context/
+│   ├── ctx.tsx                    # Auth context (session, role-based scoping)
+│   └── NotificationContext.tsx   # Notification state and polling
+├── services/
+│   ├── api.js                     # API service (Strictly scoped to user-level CRUD, no admin PUT/DELETE)
+│   └── offlineStorage.js          # Offline storage using modern expo-file-system API
+├── hooks/
+│   └── useOfflineSync.js          # Offline sync management hook with useMemo stable keys
+├── assets/
+├── app.json                        
+├── package.json                    
+└── app_progress.txt                
+
+
+================================================================================
+PART 2: Implemented Features (v1.2.4)
+
+### Authentication & Role Assignment
+[x] Email/password login with form validation
+[x] User registration (IA members prompted for address for IA assignment)
+[x] OAuth support (Google, Facebook)
+[x] Session persistence via SecureStore
+[x] Role-based access (NIA Field Officers have full field access, IA Members limited)
+
+### Home Screen (Personal Dashboard)
+[x] Welcome message with user name and assigned IA
+[x] Personal stats cards (Your Pending, Your In Progress, Your Closed)
+[x] Quick action button (New Report)
+[x] Recent personal reports list with status chips
+[x] Pull-to-refresh functionality
+
+### Custom Bottom Navigation (v1.2.2)
+[x] Floating navbar with rounded top corners (30px radius)
+[x] Full width design extending to bottom with safe area support
+[x] Three tab buttons: Reports, Camera, Map
+[x] Camera mode animation on navigation to camera tab
+    - Background color transition green to black
+    - Camera icon scales and translates upward
+    - White shutter button appears with glow effect
+    - Form icon fades in at center
+    - Side icons fade to 50% opacity
+
+### Geo-Camera & Report Form (Core Feature)
+[x] Image picker (camera) with 5-image limit
+[x] 1-5 scale ratings for Water Level, Silt Level, Debris Level
+[x] Default Presets (Normal: all 3s, Cleaning: Silt/Debris 1s, Severe: all 5s)
+[x] Category selection (Inspection, Maintenance, Cleaning, Issue, Other)
+[x] Remarks text input
+[x] GPS location auto-detection / reverse geocoding
+[x] Report submission
+
+### Integrated GIS Map (Field View - In Progress Only)
+[x] MapView displaying ONLY reports marked as "In Progress"
+[x] Interactive map of irrigation canal networks
+[x] Clickable markers to view report details
+[x] Legend for category symbols
+
+### Personal Ticket System (Tracking & Comments)
+[x] List view of user's own submitted reports (My Reports) - now in (profile) group
+[x] Timeline display of ticket status (Pending -> In Progress -> Closed)
+[x] Read-only view of admin actions and resolution summaries
+[x] Comment functionality explicitly for tickets marked "In Progress"
+
+### Profile & Settings
+[x] Profile screen with user info, role, stats
+[x] Navigation to My Reports and Notifications from profile
+[x] Settings accessible via drawer menu (redirects to profile)
+
+### Notifications (v1.2.5)
+[x] Notification Bell with unread count badge in top navigation
+[x] Dropdown modal showing recent notifications with mark-as-read
+[x] Automatic polling for unread notification count
+[x] Navigation to ticket detail on notification click
+[x] Backend integration: GET /api/notifications, /unread-count, /read-all
+[x] Types: ticket_in_progress, ticket_closed, ticket_rejected, sub_status_update
+
+### API Service (Strict Scoping)
+[x] Endpoints locked to personal GET/POST requests
+[x] Admin routes (ticket status changes, map layer configs, user management) removed
+[x] Only GET for GIS features, presets, sub-statuses
+[x] Personal reports/tickets only (my_reports, my_tickets params)
+
+
+================================================================================
+PART 3: Features Removed / Changed
+===============================================================================
+
+[x] Removed: Global ticket list (tickets.tsx) - Admin only
+[x] Removed: Settings screen (settings.tsx) - Admin only
+[x] Removed: SettingsContext - Admin only
+[x] Removed: Delete report endpoint - Mobile users cannot delete
+[x] Removed: Ticket status update endpoint - Mobile users cannot change status
+[x] Removed: Ticket "Certify & Acknowledge", "Confirm Resolution", "Reject/Invalid" actions
+[x] Removed: Map layer controls, category filters, status toggles
+[x] Removed: Global stats (all system-wide pending/closed tickets)
+[x] Removed: CRUD for ticket-sub-statuses, report-presets, GIS features, IAs
+[x] Removed: my-reports, profile, notifications from bottom tab bar (moved to profile group)
+[~] Changed: Me tab filtering (v1.2.6)
+    - Removed unused my_reports / my_tickets API call params (backend doesn't support them)
+    - Added useSession() for current user
+    - myReports = allReports where r.user_id === user?.id
+    - myTickets = allTickets where origin Report's user_id === user?.id
+
+
+================================================================================
+PART 4: Features That Need Updates/Improvements (Remaining)
+================================================================================
+
+[x] Offline Storage System - IMPLEMENTED (v1.2.6)
+    - services/offlineStorage.js - Local file-based storage using modern expo-file-system API
+    - hooks/useOfflineSync.js - React hook with useMemo stable keys to prevent re-renders
+    - Deferred report submission when offline (auto-saves to local)
+    - Auto-sync queue when network restored
+    - Cached data loads instantly on tab switch, then refreshes from network
+[x] Draft Report System - IMPLEMENTED (v1.2.6)
+    - Draft auto-created the instant photo is captured in app/(tabs)/camera.tsx
+    - currentDraftId tracked in state; uniq id = local_<timestamp> prevents duplicates
+    - Previous in-flight draft deleted before writing new one on each photo capture
+    - Submit online → deletePendingReport removes draft, report sent to backend
+    - Submit offline → draft stays in pending_reports.json, auto-sync on network restore
+    - Tap ✕ / Retake on open form → draft silently deleted via deletePendingReport
+    - App crash / force-close → draft survives on disk via expo-file-system, reloads on next launch
+[x] Drafts Shown at Top of Me Tab
+    - app/(tabs)/index.tsx: loadDrafts() called via useFocusEffect on HomeScreen tab
+    - draftItems state prepended to filteredData for the 'me' view
+    - Grayed-out card (opacity 0.82, bg #f0f0f0), gray "DRAFT" badge + "Draft" status pill
+[x] Draft Resume from Me tab → Camera form (v1.2.6)
+    - Tapping a draft card opens camera with ?draft=<local_id>
+    - useFocusEffect in camera.tsx rehydrates all form fields from pending_reports.json
+    - currentDraftId set on resume so submit/dead-code can clean the right draft
+[x] Delete Draft (v1.2.6)
+    - Red trash-icon button on every draft card; calls deletePendingReport(draftId)
+    - e.stopPropagation prevents card from also opening the camera
+[~] Image compression before upload to save mobile data
+
+
+================================================================================
+PART 5: Features Not Yet Implemented
+================================================================================
+
+[ ] Push notification setup (expo-notifications native integration) - Polling works for now
+[ ] Real-time WebSocket connection for ticket updates (replacing polling)
+[ ] Geo-fence filtering for IA members (show only assigned IA reports)
+
+
+================================================================================
+PART 6: Network Configuration
+================================================================================
+
+For local testing:
+  - Update EXPO_PUBLIC_API_URL in .env to your local IP (e.g., http://192.168.1.192:3000/api)
+  - Restart Expo with: npx expo start --clear
+
+For deployment:
+  - Already configured to use: https://irrigis-backend.onrender.com/api
+  - CORS configured to allow render.com domains

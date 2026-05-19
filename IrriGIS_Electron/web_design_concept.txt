@@ -1,0 +1,216 @@
+Phase 1: Global Master Layout & Theme
+Color Palette: * App Background: Off-white (bg-slate-50)
+
+Panels/Cards: Pure white (bg-white) with subtle shadows (shadow-sm)
+
+Primary Accent (Buttons/Active states): Muted Teal (#74A5A8 / bg-teal-600)
+
+Secondary Accent: Grass Green (#9BB88D)
+
+Status Chips: Mint Green (bg-emerald-100 text-emerald-700) for 'In Progress', Sky Blue (bg-blue-100 text-blue-700) for 'Pending', Soft Red (bg-red-100 text-red-700) for 'Closed/Severe'.
+
+Layout Structure: A persistent Sidebar on the left (w-64, white background) and a Top Navbar.
+
+Sidebar Navigation: Logo at the top. Menu items: Dashboard, Monitoring, Reports, History, Users. The active item should have a Muted Teal background with white text. Pin a 'Sign Out' button to the bottom.
+
+Top Navbar: Page title on the left. On the right, add a Notification Bell icon (with a red unread badge) and a User Profile Avatar. Clicking the bell should open a dropdown tray showing recent system alerts.
+
+Phase 2: The Login Screen (Authentication)
+Layout: A modern 50/50 split-screen layout (h-screen).
+
+Left Pane: A large, high-quality placeholder image of an agricultural irrigation canal, overlaid with the IrriGIS logo and a dark, semi-transparent gradient.
+
+Right Pane (Form): A clean, centered login form. Include fields for Email and Password, and a Muted Teal 'Sign In' button.
+
+Specific Text Requirement: Below the login button, add a muted helper text that says: "NIA Personnel: Please log in using your @nia.gov.ph institutional email for full administrative access. IA Admins use assigned credentials."
+
+Phase 3: Monitoring Panel (Exploded GIS Map)
+Layout: The main content area should be a full-bleed map container (placeholder for react-leaflet to load QGIS canal route data).
+
+GIS Layer Controls (Crucial): In the top-right corner of the map, overlay a floating white card (Floating Panel). This is the 'Exploded View' toggle. Include checkboxes for: [x] Canal Routes, [ ] Water Level Alerts, [x] Debris Blockages, and [ ] Siltation Zones.
+
+Interactive Map Pins: Place mock map markers. Clicking a marker should not open a small popup. Instead, it should trigger a Right-Side Drawer (w-96, sliding in from the right edge of the screen).
+
+Drawer Content: Display the Location Name, Date, a Status Chip, and the specific Water/Silt/Debris levels. Include a small thumbnail of the geo-tagged photo.
+
+Phase 4: Reports Panel (Ticket System)
+Top Bar: Include three dropdown filters: "Sort by Urgency", "Filter by Category", and "Filter by Location", plus a search bar.
+
+Main View: A clean Data Grid displaying tickets. Columns: ID, Submission Date, Location, Submitter, and Status.
+
+Details View (Triggered on row click): Replace the table with a two-column detailed layout.
+
+Left Column: The ticket details and a vertical 'Timeline/Stepper' showing the ticket lifecycle (Created -> Acknowledged -> In Progress -> Closed).
+
+Action Area: Below the timeline, add an "Update Status / Log Action" form. Include a multiline text area for the admin to log deployment actions (e.g., 'Dispatched backhoe') and a button to update the ticket status.
+
+Right Column: The attached geo-tagged photo and a static mini-map showing the exact coordinates.
+
+Phase 5: History Panel (Database)
+Layout: A single, robust Data Grid. Do not use secondary pages for locations.
+
+Controls: Above the table, add a Date Range Picker and a 'Barangay' select dropdown to filter the historical data.
+
+Table Columns: Barangay, Start Date, Resolution Date, Days to Resolve, Initial Problem, and a new column called 'Resolution Remarks' showing how the issue was fixed.
+
+Phase 6: Analytics Dashboard (Graphical Summaries)
+Layout: A grid of cards (grid-cols-1 md:grid-cols-3 md:grid-rows-2).
+
+Top Row (KPIs): Three small summary cards: 'Total Open Reports', 'Average Resolution Time (Days)', and 'Active Maintenance Crews'.
+
+Bottom Row (Charts - use recharts placeholders):
+
+Card 1 (span-2): A Line Chart showing 'Reports Submitted Over Time' (filtering by month).
+
+Card 2 (span-1): A Bar Chart showing 'Most Frequent Issues by Barangay' (e.g., Katangawan vs. Conel)."
+
+
+Rough Concepts:
+Global Theme & Styling (Web Adaptation)
+Instruct your AI to use the mobile palette adapted for a spacious web layout:
+
+App Background: Very Light Gray/Off-White (approx. #F8FAFC) to make the map and panels pop.
+
+Sidebar Background: Pure White (#FFFFFF) with a subtle right border or shadow.
+
+Top Navbar Background: Pure White (#FFFFFF).
+
+Active Menu Highlight: Muted Teal/Blue (approx. #74A5A8) with white text.
+
+Inactive Menu Items: Medium Gray (#64748B).
+
+Map Lines (Canals): Bright Cyan/Blue for high visibility against the map background.
+
+Status Badges (Same as mobile): * "In Progress": Bright Mint Green text/bg.
+
+"Pending": Sky Blue text/bg.
+
+"Obstructed/Severe": Soft Red/Coral text/bg.
+
+UI/UX Improvements to Request
+Ditch the floating table: Tell the AI to remove that tiny table in the top right. Instead, implement a "Right-Side Details Drawer". When an admin clicks a map pin, a sleek panel slides out from the right side of the screen showing the full ticket details, photos, and the history of that specific canal segment.
+
+Modernize the Sidebar: Change it from solid green to a clean white sidebar. Use the Muted Teal for the active tab highlight.
+
+Clean Map Popups: The current tooltip is just text. The AI should use a styled "Card" component for the map popups, mirroring the look of the mobile feed cards.
+
+
+
+
+
+1. Overall Layout:
+
+Use a CSS Grid or Flexbox layout featuring a fixed Left Sidebar, a fixed Top Navbar, and a main content area that takes up the remaining viewport (which will hold a full-bleed map).
+
+2. Left Sidebar (Navigation):
+
+Background: Pure White (#FFFFFF) with a subtle border-r.
+
+Header: "irriGIS" logo/text in a bold, dark font with a dark green icon.
+
+Menu Items: "Monitoring" (Active), "Reports", "History", "Users", "Dashboard".
+
+Styling: Inactive links should be gray. The active "Monitoring" link should have a Muted Teal (#74A5A8) background with white text and rounded corners (rounded-lg).
+
+Bottom: A "Sign out" button pinned to the bottom of the sidebar.
+
+3. Top Navbar:
+
+Background: Pure White with a subtle drop shadow (shadow-sm).
+
+Left: Page Title "MONITORING" in a bold, dark gray sans-serif font (text-xl font-bold).
+
+Right: Two icons: A Notification Bell and a User Profile Avatar.
+
+4. Main Content Area (The Map):
+
+This area should be a container ready to hold a mapping library (like React-Leaflet or Mapbox).
+
+Overlay Elements: Add absolute positioned UI elements over the map area:
+
+Map controls (zoom in/out) in the bottom right corner.
+
+5. Map Interactions & Right-Side Drawer (Crucial UX Improvement):
+
+Create a mock map marker (a red pin).
+
+Create an interactive Tooltip/Popup for the pin containing a small white Card with rounded corners (rounded-xl). Inside, display: Location Name (bold), Date, and a Status Badge (e.g., "In Progress" in Mint Green).
+
+The Details Drawer: Instead of a floating table, build a collapsible Drawer (Side Panel) on the right side of the screen (w-96, sliding in from the right).
+
+Drawer Content: When a user clicks a map pin, this drawer should open and display the detailed telemetry: "Water Level", "Silt Level", "Debris Level", the submitted "Remarks", and the user who reported it. Style this drawer to look like the detailed ticket view from our mobile app."
+
+
+
+
+
+UI/UX Critique & Improvement Concepts
+1. The Reports Panel (Figure 3.25)
+
+The Flaw: The main table is cramped. The "Details" view is poorly organized—the map and photo are just floating on the right, and the timeline text at the bottom is disconnected from the rest of the data.
+
+The Fix: * Upgrade to a modern Data Grid with a clean white background, subtle row borders, and hover effects.
+
+For the Details view, use a Two-Column Card Layout. The left card holds the text details and the vertical timeline (reusing the timeline concept from your mobile app). The right card holds the media (the photo and a mini-map).
+
+2. The History Panel (Figure 3.26)
+
+The Flaw: The table has too much empty horizontal space. When you click a location, it takes you to a new page that is mostly empty except for a giant "BRGY. CONEL" button and a single row of data. This is a lot of clicks for very little information.
+
+The Fix: * Merge this into a single, robust Historical Data Grid. Instead of clicking to a new page to see a specific Barangay, add a Filter Bar at the top of the table. Users can just select "Katangawan" from a dropdown to filter the table.
+
+Add a column for "Resolution Remarks" so admins can see how it was fixed at a glance.
+
+3. The Users Panel (Figure 3.27)
+
+The Flaw: The huge red "Deactivate" buttons draw too much attention; they look like the primary action of the whole page. The modal (popup) for confirming deactivation is completely unstyled and lacks a dark overlay (backdrop) to focus the user's attention.
+
+The Fix:
+
+Add User Avatars (circles with initials or profile pics) next to the names to match the mobile app's feel.
+
+Hide the destructive "Deactivate" action inside a Three-Dot Menu (ellipsis) at the end of the row, or make it a subtle red outline button.
+
+Build a proper Modal Dialog for the confirmation with a dimmed background overlay, a clear warning message, and styled "Cancel" and "Confirm" buttons.
+
+
+
+
+
+Global Theme Variables to Use:
+
+Background: Off-white (bg-slate-50)
+
+Cards/Tables: Pure white (bg-white) with rounded corners (rounded-xl) and subtle shadow (shadow-sm).
+
+Primary Accent: Muted Teal (#74A5A8)
+
+Text: Dark Slate (text-slate-800) for headers, Medium Gray (text-slate-500) for secondary text.
+
+1. Reports Panel (<ReportsPanel />)
+
+Main View: A modern data table. Columns: Location, Date & Time, Problem Details (Water/Silt/Debris), and Status (using the rounded colored chips from the mobile design: Mint Green for In Progress, Sky Blue for Pending). Add a "Search" input and a "Filter by Status" dropdown above the table.
+
+Details View (Triggered on row click): A two-column grid (grid-cols-3).
+
+Left Column (span 2): A white card containing the textual details (Location, Coordinates, Assigned IA), followed by a vertical Stepper/Timeline component showing the report creation, updates, and estimated resolve date.
+
+Right Column (span 1): A white card containing the attached report image (rounded-lg object-cover) stacked above a small, static mini-map component showing the exact pin location.
+
+2. History Panel (<HistoryPanel />)
+
+Create a robust data table for resolved issues. Columns: Barangay, Start Date, Resolution Date, Days to Resolve, and Initial Problem.
+
+Crucial UI: Do not make secondary pages for specific Barangays. Instead, add a prominent control bar above the table with a Select dropdown to filter by "Barangay" and a date-picker to filter by date range.
+
+3. Users Panel (<UsersPanel />)
+
+Create a user management table. Columns: User (Include a circular Avatar placeholder next to their Name and Email), Association, Role, and Date Added.
+
+Actions: Do not use giant red buttons. At the end of each row, add a subtle 'Action' column. Depending on user status, show a minimal outline button (e.g., border-red-500 text-red-500 for Deactivate, border-teal-500 text-teal-500 for Activate).
+
+Confirmation Modal: Include a hidden Modal component that appears when "Deactivate" is clicked. It must have a dark, semi-transparent backdrop (bg-black/50 backdrop-blur-sm). The modal box should be white, centered, with a bold warning title, a subtext explaining the action, a gray "Cancel" button, and a solid red "Deactivate" button."
+
+
+
+

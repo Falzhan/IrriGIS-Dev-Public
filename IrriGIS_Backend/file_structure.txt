@@ -1,0 +1,633 @@
+================================================================================
+                        IrriGIS Project - File Structure
+================================================================================
+
+================================================================================
+PART 1: IrriGIS_Backend (Express.js + PostgreSQL/PostGIS)
+================================================================================
+
+IrriGIS_Backend/
+├── config/
+│   ├── database.js             # Sequelize DB configuration
+│   └── passport.js             # Google & Facebook OAuth strategies (env-based callback URLs, session token generation)
+├── models/
+│   ├── index.js                # Sequelize initialization & associations
+│   ├── user.js                 # User model (nia_admin, nia_field_officer, ia_admin, ia_member) + session_token
+│   │   ### Core Tables
+│   │   - `users` - User management with roles (nia_admin, nia_field_officer, ia_admin, ia_member) + session_token
+│   │   - `reports` - Field reports with water/silt/debris levels, location, images
+│   │   - `report_images` - Report photo attachments
+│   │   - `report_tickets` - Ticket system with workflow states
+│   │   - `gis_features` - Canal lines (MultiLineString geometry)
+│   │   - `irrigator_associations` - IA areas (MultiPolygon geometry)
+│   │   - `river_irrigation_systems` - RIS data
+│   │   - `notifications` - User notifications
+│   │   - `audit_logs` - Action tracking
+│   ├── report.js               # Report model (water/silt/debris levels, location GeoJSON, location_name, ticket_id for grouping)
+│   ├── reportImage.js          # Report images (multiple images per report)
+│   ├── reportTicket.js         # Ticket system (status, assignment, comments, workflow) - 1:N via ticket_id (reportId allowNull=true)
+│   ├── ticketSettings.js     # Ticket grouping settings (proximity_threshold_meters, auto_group_enabled)
+│   ├── ticketSubStatus.js      # Sub-status for tickets (customizable workflow states)
+│   ├── reportPreset.js         # Report presets (predefined inspection/maintenance templates)
+│   ├── gisFeature.js           # GIS features (canals, laterals, farm ditches, pipelines)
+│   ├── irrigatorAssociation.js # Irrigator Association (IA) model
+│   ├── riverIrrigationSystem.js# River Irrigation System (RIS) model
+│   ├── notification.js         # User notifications (ticket updates, assignments, comments) - includes related_ticket_id and related_report_id fields
+│   └── auditLog.js             # Audit trail for tracking user actions
+├── controllers/
+│   ├── authController.js           # Login, register (JWT + bcrypt + session token), social auth support
+│   ├── userController.js           # CRUD users, reset password, get IAs (includes ris_id, service_area)
+│   ├── reportController.js         # CRUD reports with image upload, pagination, filtering, location_name
+│   ├── ticketController.js         # CRUD tickets, status updates, comments, assignment
+│   │   - Triggers notifyTicketUpdate on status change
+│   │   - Triggers notifySubStatusChange (NEW) on workflow progress updates
+│   │   - Triggers notifyNewComment when comments are added
+│   ├── ticketSubStatusController.js# CRUD ticket sub-statuses (workflow states)
+│   ├── reportPresetController.js   # CRUD report presets (inspection templates)
+│   ├── gisController.js            # GeoJSON reports/features, RIS/IA lists, stats, GIS feature CRUD, IA CRUD
+│   │   - getIAList: returns ris_id and service_area (GeoJSON format)
+│   │   - createGISFeature/updateGISFeature: handles empty string to null for UUID fields (ris_id, ia_id)
+│   │   - Updated getReportsGeoJSON: Added created_at to attributes to ensure reports always have date field
+│   │   - Updated ticket_id logic: Uses report.ticket_id when available, fallback to ticket.id from association
+│   │   - Added console logging for debugging report date issues
+│   └── notificationController.js   # CRUD notifications, mark read, grouped ticket notifications
+│       - notifyNewReport: Notifies nia_admins of new reports (fixed PostGIS geometry access)
+│       - notifyTicketUpdate: Notifies ALL submitters of reports under a ticket (handles grouped tickets 1:N)
+│       - notifyNewComment: Notifies all unique submitters in ticket group + assigned user
+│       - notifySubStatusChange (NEW): Notifies submitters of workflow progress updates
+│       - Added debug logging for troubleshooting notification creation
+├── routes/
+│   ├── auth.js                 # POST /api/auth/login, /register, OAuth callbacks (session token + redirect to frontend)
+│   ├── users.js                # GET/POST/PUT/DELETE /api/users, /ias
+│   ├── report.js               # GET/POST/PUT/DELETE /api/reports (with image upload, location_name)
+│   ├── ticket.js               # GET/POST/PUT/DELETE /api/tickets, /:id/comments
+│   ├── ticketSettings.js   # GET/PUT /api/ticket-settings (ticket grouping configuration)
+│   ├── ticketSubStatus.js      # GET/POST/PUT/DELETE /api/ticket-sub-statuses
+│   ├── reportPreset.js         # GET/POST/PUT/DELETE /api/report-presets, /by-category, /categories
+│   ├── gis.js                  # GET /api/gis/reports, /features, /ris, /ias, /stats, /features CRUD, /ias CRUD
+│   - POST /features           # Create GIS feature (canal line) - handles null UUIDs
+│   - PUT /features/:id        # Update GIS feature - handles null UUIDs
+│   - DELETE /features/:id       # Delete GIS feature
+│   - GET /ias               # Get IAs list (includes ris_id, service_area as GeoJSON)
+│   - GET /ias/geojson        # Get IAs as GeoJSON
+│   - POST /ias                # Create IA (irrigator association)
+│   - PUT /ias/:id            # Update IA
+│   - DELETE /ias/:id          # Delete IA
+│   └── notification.js         # GET/PUT/DELETE /api/notifications, /unread-count, /read-all
+├── middleware/
+│   ├── auth.js                 # JWT auth + session_token validation (single-session enforcement, sessionExpired flag)
+│   ├── audit.js                # Audit logging middleware for tracking CRUD operations
+│   └── upload.js               # Multer file upload middleware (images to public/uploads, profile images to public/users)
+├── services/                   # (Reserved for future services)
+├── sql/
+│   ├── irrigis-summary-plain.sql # Database schema summary
+│   ├── report_presets_setup.sql        # Report presets initialization data
+│   └── ticket_sub_status_setup.sql     # Ticket sub-status initialization data
+├── public/
+│   ├── uploads/                # Uploaded report images (served statically)
+│   └── users/                  # User profile images (served statically)
+├── .env                        # Environment variables (DB, JWT, OAuth keys, FRONTEND_URL, BACKEND_URL)
+├── app.js                      # Express app entry point (routes, CORS, DB sync)
+├── package.json                # Dependencies (Express, Sequelize, pg, JWT, bcrypt, multer, passport, crypto)
+├── api_doc.txt                 # API documentation
+├── quick_project_specs.txt     # Project specifications summary
+├── file_structure.txt          # This file
+└── backfill-location-names.js  # One-time script to populate location_name from Nominatim API
+
+
+================================================================================
+PART 2: IrriGIS_Admin (React + Vite + Tailwind CSS)
+================================================================================
+
+IrriGIS_Admin/
+├── index.html                  # HTML entry point
+├── package.json                # Dependencies (React, Leaflet, Recharts, Lucide, Router)
+├── vite.config.js              # Vite configuration (port 5173)
+├── tailwind.config.js          # Tailwind CSS config (primary: #74A5A8, secondary: #9BB88D)
+├── postcss.config.js           # PostCSS configuration
+├── requirements.txt            # Project requirements/notes
+├── web_design_concept.txt      # Design concept documentation
+├── AGENTS.md                   # Agent-specific instructions for task execution
+├── src/
+│   ├── main.jsx                # React entry point
+│   ├── App.jsx                 # Main app with routing, protected routes, OAuth callback/failure routes
+│   ├── index.css               # Global styles (Tailwind imports + Leaflet/Geoman z-index fixes)
+│   ├── components/
+│   │   └── Layout.jsx          # App shell (sidebar, navigation, notification dropdown, user profile dropdown)
+│   ├── context/
+│   │   ├── AuthContext.jsx     # Auth state (login, logout, OAuth login, session polling for single-session enforcement)
+│   │   └── NotificationContext.jsx # Notification polling with adaptive intervals
+│   ├── pages/
+│   │   ├── Login.jsx           # Login with email/password, Google/Facebook OAuth buttons, remember me, split-screen
+│   │   ├── Register.jsx        # IA Admin registration with IA selection, profile image upload, GPS location auto-fill
+│   │   ├── OAuthCallback.jsx   # Handles OAuth redirect back from backend (token extraction, auto-login)
+│   │   ├── Dashboard.jsx       # KPI cards, monthly/top IA charts (Recharts)
+│   │   ├── Monitoring.jsx      # Leaflet map with GIS layers, filters, layer controls, canal history panel
+│   │   ├── Reports.jsx         # Individual reports list (fetched from api.getReports), shows ticket status badge, read-only detail view
+│   ├── Tickets.jsx         # Grouped tickets (1:N via ticket_id), carousel view, workflow controls (Acknowledge/Close/Reopen)
+│   │   ├── History.jsx         # Closed reports history with date/IA filters, days-to-resolve
+│   │   ├── Users.jsx           # User CRUD, activate/deactivate, view details modal
+│   │   ├── Settings.jsx        # 4 tabs: Personalization, Report Settings (collapsible sub-statuses + presets), GIS Map, API Testing
+│   │   - Personalization Tab: Color Personalization + Display Settings (continuous list)
+│   │   - Report Settings Tab: Collapsible sub-statuses section (open by default) + Report Presets section (open by default)
+│   │   - GIS Map Tab: Canal Lines list + IA Areas list with sub-tabs
+│   │     - Interactive map centered on General Santos (6.13, 125.03) with zoom 12
+│   │     - Leaflet-Geoman drawing integration for creating/editing geometries
+│   │     - In-card editing (no modal) - click Edit to expand form in list
+│   │     - Click on map feature to select and scroll list to highlighted card
+│   │     - Canal lines use custom colors from Color Personalization settings
+│   │     - MultiLineString for canal lines, MultiPolygon for IA areas
+│   │     - Add new button creates blank card at bottom for drawing new features
+│   │   - API Testing Tab: Built-in API console for all endpoints
+│   │   └── ApiTesting.jsx      # API tester with auto dummy user, timer cleanup
+│   └── services/
+│       └── api.js              # API service class (VITE_API_URL configurable, all endpoint methods)
+
+
+================================================================================
+PART 3: IrriGIS_Electron (Electron + React + Vite + Tailwind CSS)
+================================================================================
+
+IrriGIS_Electron/
+├── index.html                  # HTML entry point
+├── package.json                # Dependencies (Electron, React, Leaflet, Recharts, Lucide, Router)
+├── vite.config.js              # Vite configuration with Electron plugin
+├── tailwind.config.js          # Tailwind CSS config (primary: #74A5A8, secondary: #9BB88D)
+├── postcss.config.js           # PostCSS configuration
+├── main.js                     # Electron main process (window creation, IPC handlers)
+├── preload.js                  # Electron preload script (secure IPC bridge)
+├── src/
+│   ├── main.jsx                # React entry point
+│   ├── App.jsx                 # Main app with routing, protected routes, OfflineProvider wrapper
+│   ├── index.css               # Global styles (Tailwind imports + Leaflet/Geoman z-index fixes)
+│   ├── components/
+│   │   └── Layout.jsx          # App shell with sidebar, navigation, notification dropdown,
+│   │                             user profile dropdown, connection status indicator (green/gray dot),
+│   │                             and connection status toast notification (bottom-right, click-to-close)
+│   ├── context/
+│   │   ├── AuthContext.jsx     # Auth state with session polling for single-session enforcement
+│   │   ├── NotificationContext.jsx # Notification polling with adaptive intervals
+│   │   └── OfflineContext.jsx  # Offline functionality (NEW):
+│   │                             - Connectivity detection (browser events + server health checks)
+│   │                             - IndexedDB caching for API GET responses (IrriGIS_API_Cache)
+│   │                             - Toast notifications for connection status changes (10s duration)
+│   │                             - Persistent offline data storage (IrriGIS_OfflineDB)
+│   │                             - cacheOfflineData, getOfflineData, clearOfflineCache helpers
+│   ├── pages/
+│   │   ├── Login.jsx           # Login with email/password, OAuth buttons, backend URL override
+│   │   ├── Register.jsx        # IA Admin registration with IA selection
+│   │   ├── Dashboard.jsx       # KPI cards, monthly/top IA charts
+│   │   ├── Monitoring.jsx      # Leaflet map with GIS layers, canal history panel
+│   │   ├── Reports.jsx         # Individual reports list with ticket status
+│   │   ├── Tickets.jsx         # Grouped tickets with carousel view and workflow controls
+│   │   ├── History.jsx         # Closed reports history with date/IA filters
+│   │   ├── Users.jsx           # User CRUD, activate/deactivate
+│   │   └── Settings.jsx        # 5 tabs: Personalization, Report Settings, GIS Map, API Testing, Offline Data
+│   │                             - API Testing Tab: Backend URL override (localStorage persistence, Reset to Default)
+│   │                             - Offline Data Tab (NEW): Connection status, cache statistics,
+│   │                               prefetch data for offline use, clear cache, offline mode documentation
+│   └── services/
+│       └── api.js              # API service with IndexedDB caching (NEW):
+│                                 - GET responses automatically cached to IndexedDB
+│                                 - Cache key based on full URL + token hash
+│                                 - Serves cached data when offline/network fails
+│                                 - clearAPICache() export for manual cache clearing
+
+
+================================================================================
+PART 4: API Endpoints Summary (IrriGIS_Backend)
+================================================================================
+
+### Authentication (/api/auth)
+- POST /login                    - Email/password login
+- POST /register                 - User registration
+- GET /google                    - Google OAuth redirect
+- GET /google/callback           - Google OAuth callback
+- GET /facebook                  - Facebook OAuth redirect
+- GET /facebook/callback         - Facebook OAuth callback
+- GET /test                      - Protected test endpoint
+
+### Users (/api/users)
+- GET /                          - Get all users (nia_admin only)
+- GET /:id                       - Get user by ID
+- GET /me                        - Get current user profile
+- GET /ias                       - Get irrigator associations (includes ris_id, service_area as GeoJSON)
+- POST /                         - Create user (nia_admin only)
+- PUT /:id                       - Update user
+- PUT /:id/password              - Reset password (nia_admin only)
+- DELETE /:id                    - Delete user (nia_admin only)
+
+### Reports (/api/reports)
+- GET /                          - Get all reports (with pagination, filtering, includes ticket info)
+- GET /:id                       - Get single report
+- POST /                         - Create report (with image upload, auto-groups to existing ticket if matching criteria)
+- PUT /:id                       - Update report (with image upload, supports ticket_id for merge/unmerge)
+- DELETE /:id                    - Delete report (nia_admin only)
+
+### Ticket Settings (/api/ticket-settings)
+- GET /                          - Get ticket grouping settings
+- PUT /                          - Update settings (proximity_threshold_meters, auto_group_enabled)
+
+### Tickets (/api/tickets)
+- GET /                          - Get all tickets (with pagination, filtering)
+- GET /:id                       - Get single ticket
+- POST /                         - Create ticket manually (nia_admin only)
+- PUT /:id                       - Update ticket status/assignment
+- POST /:id/comments             - Add comment to ticket
+- DELETE /:id                    - Delete ticket (nia_admin only)
+
+### Ticket Sub-Statuses (/api/ticket-sub-statuses)
+- GET /                          - Get all sub-statuses
+- GET /:id                       - Get sub-status by ID
+- GET /for-ticket?ticket_id=     - Get sub-statuses for a specific ticket
+- POST /                         - Create sub-status (nia_admin only)
+- PUT /:id                       - Update sub-status (nia_admin only)
+- DELETE /:id                    - Delete sub-status (nia_admin only)
+
+### Report Presets (/api/report-presets)
+- GET /                          - Get all presets
+- GET /:id                       - Get preset by ID
+- GET /by-category?category=     - Get presets by category
+- GET /categories                - Get all categories
+- POST /                         - Create preset (nia_admin only)
+- PUT /:id                       - Update preset (nia_admin only)
+- DELETE /:id                    - Delete preset (nia_admin only)
+
+### GIS (/api/gis)
+- GET /reports                   - Get reports as GeoJSON (with spatial filtering)
+- GET /features                  - Get GIS features as GeoJSON (canal lines)
+- GET /features/:id              - Get single GIS feature
+- POST /features                 - Create GIS feature (nia_admin only) - converts empty strings to null for UUID fields
+- PUT /features/:id              - Update GIS feature (nia_admin only) - converts empty strings to null for UUID fields
+- DELETE /features/:id           - Delete GIS feature (nia_admin only)
+- GET /ris                       - Get river irrigation systems list (PUBLIC - no auth required)
+- GET /ris/:id                   - Get RIS by ID
+- GET /ias                       - Get irrigator associations list (includes ris_id, service_area as GeoJSON)
+- GET /ias/geojson              - Get irrigator associations as GeoJSON
+- GET /ia/:id                   - Get IA by ID
+- POST /ias                     - Create IA (nia_admin only)
+- PUT /ias/:id                  - Update IA (nia_admin only)
+- DELETE /ias/:id                - Delete IA (nia_admin only)
+- GET /stats                     - Get dashboard stats (nia_admin, nia_field_officer only)
+
+### Notifications (/api/notifications)
+- GET /                          - Get notifications (with pagination)
+- GET /unread-count              - Get unread notification count
+- PUT /:id/read                  - Mark notification as read
+- PUT /read-all                  - Mark all notifications as read
+- DELETE /:id                    - Delete notification
+
+### Static Files
+- GET /uploads/*                 - Serve uploaded report images
+- GET /users/*                  - Serve user profile images
+
+
+================================================================================
+PART 4: IrriGIS_Admin Features & Backend API Mapping
+================================================================================
+
+### 1. Login (Login.jsx)
+   - Email/password authentication with remember me option
+   - Google & Facebook OAuth login buttons with SVG icons
+   - Split-screen design (image left, form right)
+   - Auto-redirect if already authenticated
+   - OAuth error handling (redirects with reason: inactive/forbidden/no_ia/google/facebook)
+   - Backend: POST /api/auth/login, GET /api/auth/google, GET /api/auth/facebook
+
+### 1b. OAuth Callback (OAuthCallback.jsx)
+   - Handles redirect from backend OAuth callback
+   - Extracts token and user data from URL params
+   - Completes login via AuthContext.completeOAuthLogin()
+   - Auto-redirects to /dashboard on success, /login on failure
+
+### 2. Dashboard### Dashboard Page:
+- KPI cards (in_progress tickets, total reports, avg resolution time, active crews)
+- Monthly reports line chart (Recharts) - Shows total numbers per month
+- Top IA barangay bar chart (Recharts)
+- Quick lists for today's reports and tickets
+- Data processing from API responses
+- Backend: GET /api/gis/stats, GET /api/reports, GET /api/tickets, GET /api/users
+
+### 3. Monitoring Map (Monitoring.jsx) - UPDATED
+    - Interactive Leaflet map with custom marker icons:
+      - Red Flag marker for ORIGIN reports (ticket creators) - shows ticket status (pending/in-progress/closed)
+      - Teardrop marker for STANDALONE reports (no ticket) - shows category (inspection/maintenance/cleaning/other)
+    - Ticket/Report separation logic:
+      - Origin report = report that created a ticket (identified by ticket.reportId matching report.id)
+      - Duplicate/child reports = reports linked to same ticket (reports.ticket_id) but NOT origin - NOT displayed on map
+      - Standalone report = report with no ticket (ticket_id = null) and is_valid = true
+    - Layer control panel:
+      - Tickets section: Shows counts (Pending, In Progress, Closed) based on origin reports only
+      - Standalone Reports section: Shows count of reports with no ticket
+      - Removed "Filter by Category" section
+    - GIS feature visualization with customizable colors (localStorage)
+    - Canal route labels with auto-positioning on LineString/MultiLineString/Polygon
+    - Filter panel (feature type, RIS, IA dropdowns with clear filters)
+    - Map bounds control (auto-zoom to RIS service area)
+    - Right-side report details drawer with navigation to Reports page
+    - Canal History panel (ongoing vs past reports separation)
+    - Closed report opacity fading based on age (configurable days)
+    - Pending report marker opacity (configurable percentage)
+    - Reverse geocoding for location names (Nominatim API)
+    - Search functionality searches only visible reports (origin + standalone), excludes duplicate/child reports
+    - Backend: GET /api/gis/reports, /features, /ris, /ias, /tickets
+
+### 4. Reports (Reports.jsx) - UPDATED
+   - Fetches individual reports (not tickets) via api.getReports()
+   - Shows each report with its linked ticket's workflow status badge
+   - List view: Horizontal cards with image preview, urgency badges, category, date
+   - Detail view: Report details + images + map + read-only ticket status (NO controls)
+   - Filters: status (ticket status), urgency, search, sort
+   - Backend: GET /api/reports (includes ticket.status, ticket.subStatus, ticket.assignedUser)
+
+### 4b. Tickets (Tickets.jsx) - UPDATED
+   - Grouped tickets: 1 ticket = N reports linked via reports.ticket_id
+   - List view: Shows thumbnail, category badge, report count "grouped", status badge
+   - Detail view with carousel: Each report shows image, location, date, category, condition assessment, map
+   - Workflow controls at bottom: Pending > Acknowledge > In Progress > Close (buttons: Acknowledge, Close, Reopen, Edit Report, Reject)
+   - Backend: GET /api/tickets (includes Reports via ticket_id foreign key)
+
+### 5. Users Management (Users.jsx)
+   - User list with search (name, email)
+   - Create user modal (email, password, name, role, IA assignment)
+   - View user details modal
+   - Activate/deactivate with confirmation
+   - Role color badges
+   - Backend: GET/POST/PUT/DELETE /api/users, GET /api/users/ias
+
+### 6. History (History.jsx)
+   - Closed/resolved reports history table
+   - Filter by IA, date range, search
+   - Days-to-resolve calculation
+   - Backend: GET /api/reports
+
+### 7. Settings (Settings.jsx) - 4 Tab Interface
+   - Personalization Tab: Color Personalization + Display Settings (continuous list)
+     - Color Personalization: Map feature colors (main_canal, lateral, farm_ditch, pipeline, canal, river, other)
+       Report category colors (inspection, maintenance, cleaning, issue, other)
+       Color picker + hex input, preview swatches, save/reset to localStorage
+     - Display Settings: Days to display closed reports (1-90, default 7), pending marker opacity slider (10-80%, default 40%)
+- Report Settings Tab: Collapsible sections
+      - Ticket Sub-Statuses: CRUD with name, slug, color, description, display order (card-based grid layout)
+      - Report Presets: CRUD with name, slug, category, water/silt/debris levels, icon, description, display order, is_active
+      - Ticket Grouping: Proximity threshold slider (10-500m), auto-group toggle (NEW)
+       Category filtering dropdown, card-based grid layout with level indicators
+- GIS Map Tab:
+      - Two sub-tabs: Canal Lines / IA Areas
+      - RIS filter only for IA Areas (no Type filter)
+      - Interactive Leaflet map centered on General Santos (6.17, 125.17) with zoom 12
+      - Leaflet-Geoman drawing integration for creating/editing geometries
+      - In-card editing: Click Edit button to expand editable form fields directly in list (no modal blocking map)
+      - Click on map feature to select + scroll list to highlighted card with smooth animation
+      - Canal line colors follow Color Personalization settings (per feature_type)
+      - Selectable cards expand to show details (name, ID truncated UUID, type, RIS, IA)
+      - Save/Cancel buttons for editing, Delete button with confirmation
+      - Add button enables drawing mode for creating new features
+      - GeoJSONLabels: displays feature names as colored labels on map (matches Monitoring page style)
+      - Auto-scroll to drawing form when adding new feature
+   - API Testing Tab: Built-in API console with expandable categories, request body editing, response display
+   - Backend: GET/POST/PUT/DELETE /api/gis/features, /api/gis/ias, /api/report-presets, /api/ticket-sub-statuses
+
+### 8. API Testing (ApiTesting.jsx) - Standalone page
+   - Interactive API tester for all endpoints
+   - Auto-creates/deletes dummy user for testing (with timer-based cleanup)
+   - Tracks created user, report, ticket IDs for subsequent tests
+   - Expandable endpoint categories with method badges (GET/POST/PUT/DELETE)
+   - Custom body editing (JSON), parameter input for :id paths
+   - Response display with status code and JSON formatting
+   - Backend: All endpoints
+
+### 9. Notifications (NotificationContext + Layout.jsx) - UPDATED
+   - Adaptive polling (15s → 30s → 60s → 120s) with reset on changes
+   - Notification dropdown in top navbar with separate refs (fixed auto-closing bug)
+   - Auto-fetch notifications when dropdown opens
+   - Refresh button with loading spinner in dropdown header
+   - Mark as read / mark all / delete individual
+   - Unread count badge on bell icon (shows 9+ if >9)
+   - Smart grouping messages: "Your report and X other(s)..." for grouped tickets
+   - Notification types: new_report, ticket_in_progress, ticket_closed, ticket_rejected,
+     ticket_updated, ticket_comment, sub_status_update
+   - Visibility API integration (pauses polling when tab hidden)
+   - Backend: GET/PUT/DELETE /api/notifications, /unread-count
+
+
+================================================================================
+PART 5: User Roles & Permissions
+================================================================================
+
+## Access Control for IrriGIS_Admin (Web Admin Panel)
+
+Only the following can access IrriGIS_Admin:
+- nia_admin (requires is_active=true)
+- ia_admin (requires is_active=true AND ia_id assigned)
+
+Blocked from IrriGIS_Admin (use IrriGIS_App instead):
+- nia_field_officer
+- ia_member
+
+## Role Permissions Matrix
+
+| Role              | IrriGIS_Admin | IrriGIS_App | Notes                                          |
+|-------------------|---------------|-------------|------------------------------------------------|
+| nia_admin         | Yes           | No          | Full access, is_active=true required           |
+| nia_field_officer | No            | Yes         | Use mobile app only                            |
+| ia_admin          | Yes*          | No          | *is_active=true AND ia_id required            |
+| ia_member         | No            | Yes         | Use mobile app only                            |
+
+Notes:
+- ia_admin registration requires admin approval (is_active=false by default)
+- NIA personnel cannot register via web (must be created by nia_admin)
+- Web registration (/register) is only for ia_admin role
+- OAuth users: NIA emails auto-activated, others require admin activation
+- ia_admin can only view/manage users within their own IA
+
+
+================================================================================
+PART 6: Key Features
+================================================================================
+
+Backend:
+- JWT-based authentication with bcrypt password hashing
+- Single-session enforcement (session_token in JWT + DB validation, auto-logout on new login)
+- OAuth support (Google, Facebook) via Passport.js with env-based callback URLs
+- Role-based access control (RBAC)
+- Admin panel access restricted to nia_admin and ia_admin only (via role/is_active checks)
+- ia_admin user filtering by ia_id (can only see/manage users in their IA)
+- Account activation required (is_active=true) for all logins
+- OAuth account handling: NIA emails auto-activated, others require admin approval
+- PostGIS spatial queries and GeoJSON output
+- Multi-image upload per report (up to 5 images)
+- Profile image upload per user (stored in public/users)
+- Auto-ticket creation on report submission
+- Ticket workflow with comments and assignment
+- Customizable ticket sub-statuses (workflow states)
+- Report grouping system (1 ticket : N reports via reports.ticket_id foreign key)
+   - Auto-grouping on report creation based on: same day, same category, same gis_feature_id, proximity threshold
+   - Configurable proximity threshold (meters) and auto-group toggle in Settings
+- Report presets for quick inspection templates (with category filtering)
+- Real-time notifications for ticket updates
+- Audit logging for all CRUD operations
+- Pagination, filtering, and search across all resources
+- Ticket timestamp tracking (acknowledged_at, resolved_at)
+- Report validity tracking (is_valid, invalid_reason)
+- Workflow steps persistence for detailed progress tracking
+- Status transition validation (cannot revert to pending after acknowledgment)
+- GIS feature filtering by feature_type, ris_id, ia_id
+- Profile endpoint (GET /profile) for current user info
+- Configurable FRONTEND_URL and BACKEND_URL for HTTPS deployment
+
+- GIS Features CRUD (canal lines) with MultiLineString geometry
+- GIS Features: automatically converts empty strings to null for UUID fields (ris_id, ia_id) in create/update operations
+- Irrigator Associations CRUD with MultiPolygon (service_area) geometry
+- IA List endpoints return ris_id and service_area (GeoJSON format) for map rendering
+
+- IA Admin registration via web (/register) - requires admin approval (is_active=false by default)
+- Profile image upload during registration (optional)
+
+Layout / Navigation:
+- Collapsible sidebar with icon-only mode
+- Glassmorphic UI design (backdrop-blur, transparent cards)
+- Notification dropdown with adaptive polling (15s → 30s → 60s → 120s)
+- User profile dropdown (clickable in top-right) showing:
+  - Avatar with first letter
+  - Name, email, role
+  - IA name (if applicable)
+  - Sign Out button
+- Click-outside to close dropdowns
+- Visibility API integration (pauses polling when tab hidden)
+
+Login Page:
+- Split-screen design (image left, form right)
+- Remember me option (localStorage vs sessionStorage)
+- Auto-redirect if already authenticated
+- Loading state with spinner
+- Google & Facebook OAuth login buttons with branded SVG icons
+- OAuth error display with detailed reasons (inactive/forbidden/no_ia)
+
+Register Page (NEW):
+- IA Admin registration page (/register route)
+- Smart detection: NIA emails rejected (web registration only for ia_admin)
+- IA selection dropdown (mandatory)
+- Profile image upload with preview
+- GPS location auto-detect with manual override
+- Password confirmation
+- Fields: First/Last Name, Email, Contact, Address, IA, Profile Image
+- Backend: POST /api/auth/register with multipart form data
+
+OAuth Callback Page:
+- Loading spinner during OAuth token processing
+- Token extraction from URL params
+- Automatic login completion and redirect to dashboard
+
+Dashboard Page:
+- KPI cards (open reports, avg resolution time, active crews, critical alerts)
+- Monthly reports line chart (Recharts)
+- Top IA barangay bar chart (Recharts)
+- Data processing from API responses
+
+Monitoring Page - UPDATED:
+- Interactive Leaflet map with custom marker icons:
+  - Red Flag marker for ORIGIN reports (ticket creators) - color-coded by status (blue=pending, amber=in-progress, red=closed)
+  - Teardrop marker for STANDALONE reports (no ticket) - color-coded by category (blue=inspection, amber=maintenance, cyan=cleaning, gray=other)
+- Ticket/Report separation logic (updated):
+  - Only origin reports (where ticket.reportId = report.id) show as tickets on map
+  - Duplicate/child reports (linked via reports.ticket_id but not origin) are HIDDEN from map display
+  - Standalone reports (no ticket_id, is_valid = true) show as teardrop markers
+- Layer control panel:
+  - Tickets section: Shows counts (Pending, In Progress, Closed) based on origin reports only
+  - Standalone Reports section: Shows count of reports with no ticket
+  - Removed "Filter by Category" checkboxes section
+- GIS feature visualization with customizable colors (localStorage)
+- Canal route labels with auto-positioning on LineString/MultiLineString/Polygon
+- Canal line colors synced with Settings > Color Personalization > Map Features
+- Filter panel (feature type, RIS, IA dropdowns with clear filters)
+- Map bounds control (auto-zoom to RIS service area)
+- Right-side report details drawer with navigation to Reports page
+- Canal History panel (ongoing vs past reports separation)
+- Closed report opacity fading based on age (configurable days)
+- Pending report marker opacity (configurable percentage)
+- Reverse geocoding for location names (Nominatim API)
+- Search searches only visible reports (origin + standalone), excludes hidden duplicate reports
+
+Reports Page (UPDATED):
+- Fetches individual reports via api.getReports()
+- Shows report cards with image preview, urgency badges, linked ticket status
+- Invalid/rejected reports show "Invalid" badge overlay and "Rejected" status
+- Non-issue reports (inspection/maintenance/cleaning) show "No Ticket" status (no ticket created)
+- Detail view: Report details + images + map + read-only ticket status (no workflow controls)
+- Filters by ticket status (includes rejected), urgency, search
+
+Tickets Page (UPDATED):
+- Grouped tickets (1:N via ticket_id) with carousel showing linked reports
+- Report cards show thumbnail, category, date, water/silt/debris levels
+- Workflow controls: Acknowledge, Close, Reopen buttons, Edit Report, Reject
+- Urgency calculation: Based on average of water_level, silt_level, debris_level (1-5 scale)
+  - Critical (red): average >= 4
+  - Moderate (amber): average >= 3
+  - Low (green): average < 3
+- Urgency filtering and sorting options in UI
+
+
+ - 1 report ticket can contain multiple reports. A report is submitted, that initial report creates a ticket, and if following reports that is the same/identical will be still under the same ticket as the initial report.
+ The Dual Relationship
+There are actually two distinct connections happening between these tables, which is exactly what you need for an "Initial Report vs. Subsequent Reports" workflow.
+
+   1. The "Grouping" Relationship (One-to-Many)
+      The Connection: The id in report_tickets is linked to the ticket_id in the reports table.
+      The Diagram Evidence: You can see the line connecting these two fields, with a "crow's foot" symbol on the reports side. This symbol signifies a "Many" relationship.
+      What this means: One single report_ticket can have many reports associated with it. Whenever a new report is deemed identical to an ongoing issue, its ticket_id is just set to the existing ticket's ID, successfully grouping them together.
+
+   2. The "Origin" Relationship (One-to-One / Reference)
+      The Connection: The id in the reports table is linked to the report_id in the report_tickets table.
+      What this means: This serves as the anchor. When that very first report comes in, the system creates the ticket. By saving the initial report's ID into the report_tickets.report_id column, the ticket always has a direct pointer to the original issue that spawned it, regardless of how many duplicate reports are added later.
+
+- How the Data Flows (Step-by-Step)
+   If we trace your logic through these specific tables, the lifecycle looks like this:
+   Initial Submission: A citizen/user submits a report. A new row is created in reports. Let's say its id is Report-A.
+   Ticket Creation: The system recognizes this is a new issue and creates a new row in report_tickets (Ticket-1).
+   It sets report_tickets.report_id to Report-A (recording the origin).
+   Backlinking: The system updates Report-A so its ticket_id is set to Ticket-1.
+   Duplicate Submission: Later, a second report comes in for the same issue. A new row is created in reports (Report-B).
+   Grouping: The system detects it's the same issue as Ticket-1. It simply sets Report-B's ticket_id to Ticket-1.
+
+CRITICAL: Report Ticket Creation Rule (NEW):
+- Only reports with category='issue' create a report_tickets entry
+- Non-issue reports (inspection, maintenance, cleaning, other) are stored in reports table only
+- Non-issue reports have ticket_id = NULL and display status "No Ticket" in the UI
+- This prevents unnecessary tickets for routine inspection/maintenance reports
+
+
+Users Page:
+- User list with search (name, email)
+- Create user modal (email, password, name, role, IA assignment)
+- View user details modal
+- Activate/deactivate with confirmation
+- Role color badges
+
+History Page:
+- Closed/resolved reports history table
+- Filter by IA, date range, search
+- Days-to-resolve calculation
+
+Settings Page (4 tabs):
+- Personalization: Color Personalization (map feature + category colors) + Display Settings (days, opacity)
+- Report Settings: Collapsible sub-statuses + collapsible report presets (card-based grid)
+- GIS Map: Canal Lines + IA Areas sub-tabs, RIS filter (Type filter for Canal Lines only), in-card editing, map selection scroll sync, GeoJSONLabels for feature names, auto-scroll to drawing form
+- API Testing: Built-in console
+
+Register Page (NEW):
+- IA Admin registration page at /register
+- Smart email detection: NIA emails rejected
+- IA selection dropdown (mandatory for ia_admin)
+- Profile image upload with preview
+- GPS location auto-detect using browser Geolocation API + Nominatim reverse geocoding
+- Manual address override
+- Password confirmation
+- Direct fetch to public endpoints (no auth required)
+
+API Testing Page (standalone):
+- Auto-creates/deletes dummy user for testing
+- Tracks created user, report, ticket IDs
+- Expandable endpoint categories with method badges
+- Custom body editing (JSON), parameter input for :id paths
+- Response display with status code and JSON formatting
