@@ -88,6 +88,11 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace 'com.falzhan.IrriGISApp'
+
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId 'com.falzhan.IrriGISApp'
         minSdkVersion rootProject.ext.minSdkVersion
