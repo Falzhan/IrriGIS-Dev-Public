@@ -6,7 +6,7 @@ App Version: v1.2.6 (Expo/React Native)
 Backend API: https://irrigis-backend.onrender.com/api (or configurable via EXPO_PUBLIC_API_URL)
 
 ===============================================================================
-RECENT UPDATES (v1.2.6)
+RECENT UPDATES (v1.2.7)
 ===============================================================================
 [x] Draft / Offline Report System (NEW)
     - photo capture + auto-save draft at the moment photo is taken
