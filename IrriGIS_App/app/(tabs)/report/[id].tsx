@@ -1,6 +1,7 @@
 // app/(tabs)/report/[id].tsx
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, ScrollView, Image, Alert, RefreshControl, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, Button, ActivityIndicator, Divider, Avatar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getReportById } from '../../../services/api';
@@ -34,6 +35,7 @@ export default function ReportDetailScreen() {
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const fetchReport = async () => {
     try {
@@ -107,8 +109,8 @@ export default function ReportDetailScreen() {
   const coords = getCoordinates();
   const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
 
-return (
-    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#74A5A8']} />}>
+  return (
+    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#74A5A8']} />} contentContainerStyle={{ paddingBottom: 85 + insets.bottom }}>
       {/* Custom Top Bar */}
       <DetailTopBar title="Report Details" subtitle={report.category?.charAt(0).toUpperCase() + report.category?.slice(1)} />
 
@@ -308,8 +310,6 @@ return (
           />
         </View>
       </View>
-
-      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }

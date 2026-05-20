@@ -1,11 +1,12 @@
 // app/(tabs)/ticket/[id].tsx
 import { useEffect, useState } from 'react';
-import { StyleSheet, View, ScrollView, Image, Alert, RefreshControl, Dimensions } from 'react-native';
-import { Text, Chip, Button, TextInput, ActivityIndicator, Divider, Avatar } from 'react-native-paper';
+import { StyleSheet, View, ScrollView, Image, Alert, RefreshControl, Dimensions, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, Button, TextInput, ActivityIndicator, Divider, Avatar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTicketById, getTicketComments, getSubStatusesForTicket } from '../../../services/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import MapView, { Marker } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import DetailTopBar from '../../../components/DetailTopBar';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -22,8 +23,8 @@ const lv = (l: string) => LEVEL_VALUES[l] ?? 3;
 
 const LEVEL_DESCRIPTIONS: Record<string, Record<string, string>> = {
   water: { dry: 'No water', low: 'Minimal water', normal: 'Adequate water', high: 'Above normal', overflow: 'Flooding' },
-  silt: { clean: 'No silt', light: 'Light silt', normal: 'Moderate silt', dirty: 'Heavy silt', heavily_silted: 'Fully silted' },
-  debris: { clear: 'No obstruction', light: 'Minor debris', normal: 'Some debris', heavy: 'Heavy debris', blocked: 'Fully blocked' },
+  silt: { clean: 'No silt · Clean', light: 'Light silt', dirty: 'Heavy silt', heavily_silted: 'Fully silted' },
+  debris: { clear: 'No obstruction · Clear', light: 'Minor debris', heavy: 'Heavy debris', blocked: 'Fully blocked' },
 };
 
 const WATER_NUM_TO_SLUG = ['', 'dry', 'low', 'normal', 'high', 'overflow'];
@@ -324,26 +325,35 @@ function ReportCarousel({ reports, currentIndex, onPrev, onNext }: {
           </>
         )}
 
-        {/* Mini Map */}
+        {/* Mini Map (OpenStreetMap) */}
         {coords && coords.length === 2 && (
           <>
             <Divider style={styles.divider} />
             <Text style={styles.sectionTitle}>Location</Text>
             <View style={styles.mapContainer}>
-              <MapView
-                style={styles.map}
-                initialRegion={{
-                  latitude: coords[1],
-                  longitude: coords[0],
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
+              <WebView
+                source={{
+                  html: `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>html,body{margin:0;padding:0;height:100%;width:100%}#map{height:100%;width:100%}</style>
+</head>
+<body><div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var map=L.map('map').setView([${coords[1]},${coords[0]}],15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
+var pin=L.icon({iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',iconAnchor:[12,41],popupAnchor:[0,-41]});
+L.marker([${coords[1]},${coords[0]}],{icon:pin}).addTo(map)
+  .bindPopup('${locationName}').openPopup();
+</script></body></html>`,
                 }}
-              >
-                <Marker
-                  coordinate={{ latitude: coords[1], longitude: coords[0] }}
-                  title={locationName}
-                />
-              </MapView>
+                style={styles.map}
+                javaScriptEnabled
+                domStorageEnabled
+              />
             </View>
           </>
         )}
@@ -365,6 +375,8 @@ export default function TicketDetailScreen() {
   const [currentReportIndex, setCurrentReportIndex] = useState(0);
   const [subStatuses, setSubStatuses] = useState<any[]>([]);
   const [currentSubStatus, setCurrentSubStatus] = useState<any>(null);
+
+  const insets = useSafeAreaInsets();
 
   const fetchTicket = async () => {
     try {
@@ -455,7 +467,7 @@ export default function TicketDetailScreen() {
   const isInProgress = ticket.status === 'in_progress';
 
   return (
-    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#74A5A8']} />}>
+    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#74A5A8']} />} contentContainerStyle={{ paddingBottom: 85 + insets.bottom }}>
       {/* Custom Top Bar */}
       <DetailTopBar title="Ticket Details" subtitle={`#${ticket.id?.slice(0, 8)}`} />
 
@@ -558,65 +570,6 @@ export default function TicketDetailScreen() {
           </>
         )}
       </View>
-
-      {/* Comments Card */}
-      <View style={styles.commentsCard}>
-        <Text style={styles.cardTitle}>Comments ({comments.length})</Text>
-
-        {comments.length === 0 ? (
-          <Text style={styles.emptyComments}>No comments yet</Text>
-        ) : (
-          <View style={styles.commentsList}>
-            {comments.map((comment, idx) => (
-              <View key={comment.id || idx} style={styles.commentItem}>
-                <View style={styles.commentHeader}>
-                  <Text style={styles.commentAuthor}>
-                    {comment.User?.first_name || comment.User?.firstName || 'User'}
-                  </Text>
-                  <Text style={styles.commentDate}>
-                    {formatDate(comment.created_at)}
-                  </Text>
-                </View>
-                <Text style={styles.commentText}>{comment.comment}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {isInProgress ? (
-          <View style={styles.commentInputContainer}>
-            <TextInput
-              mode="outlined"
-              value={commentText}
-              onChangeText={setCommentText}
-              placeholder="Add a comment..."
-              style={styles.commentInput}
-              multiline
-              outlineColor="#E5E7EB"
-              activeOutlineColor="#74A5A8"
-            />
-            <Button
-              mode="contained"
-              onPress={sendComment}
-              loading={commentLoading}
-              disabled={!commentText.trim()}
-              style={styles.sendButton}
-              buttonColor="#74A5A8"
-            >
-              Send
-            </Button>
-          </View>
-        ) : (
-          <View style={styles.readOnlyNote}>
-            <Ionicons name="lock-closed" size={16} color="#9CA3AF" />
-            <Text style={styles.readOnlyText}>
-              Comments are only available when ticket is In Progress
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }

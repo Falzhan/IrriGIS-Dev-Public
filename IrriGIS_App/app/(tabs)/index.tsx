@@ -1,9 +1,12 @@
 // app/(tabs)/index.tsx
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   StyleSheet, View, ScrollView, RefreshControl,
   TouchableOpacity, Image, Alert, Animated, Text as RNText,
+  Modal, FlatList, TouchableWithoutFeedback,
 } from 'react-native';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -29,8 +32,20 @@ const lv = (l: string) => LEVEL_VALUES[l] ?? 3;
 
 type Urgency = 'critical' | 'moderate' | 'low';
 const getUrgency = (r: any): Urgency => {
-  const avg = (lv(r.water_level) + lv(r.silt_level) + lv(r.debris_level)) / 3;
-  return avg >= 4 ? 'critical' : avg >= 3 ? 'moderate' : 'low';
+  const wv = lv(r.water_level), sv = lv(r.silt_level), dv = lv(r.debris_level);
+
+  // 1. Immediate Critical — Water 1 & 5, or Silt/Debris fully blocked (5)
+  if (wv === 1 || wv === 5 || sv === 5 || dv === 5) {
+    return 'critical';
+  }
+
+  // 2. Moderate — Water 2 & 4, Silt 4, Debris 4
+  if (dv === 4 || sv === 4 || wv === 4 || wv === 2) {
+    return 'moderate';
+  }
+
+  // 3. Low — everything else
+  return 'low';
 };
 const URGENCY: Record<Urgency, { color: string; label: string }> = {
   critical: { color: '#EF5350', label: 'Critical' },
@@ -210,6 +225,17 @@ export default function HomeScreen() {
     params.tab === 'me' ? 2 : params.tab === 'tickets' ? 1 : 0
   ))[0];
 
+  // ─── Month filter ─────────────────────────────────────────────────────────────
+  const now = new Date();
+  const [filterYear, setFilterYear] = useState(now.getFullYear());
+  const [filterMonth, setFilterMonth] = useState(now.getMonth()); // 0-indexed
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+
+  const monthNames = [
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December',
+  ];
+
   // ─── Offline drafts (appear at top of Me tab) ─────────────────────────────────
   const [draftItems, setDraftItems] = useState<any[]>([]);
 
@@ -264,6 +290,22 @@ export default function HomeScreen() {
   const standaloneReports = useMemo(() =>
     allReports.filter((r: any) => !r.ticket_id), [allReports]);
 
+  const filterActive = filterYear !== now.getFullYear() || filterMonth !== now.getMonth();
+  const insets = useSafeAreaInsets();
+  const pickerOpenTop = 64 + insets.top; // matches CustomTopBar height on both platforms
+
+  const getFilteredByMonth = useCallback((list: any[]): any[] => {
+    return list.filter((item: any) => {
+      // Direct report
+      const reportDirect = item.category ? item : item.Report;
+      if (!reportDirect) return false;
+      const raw = reportDirect.created_at ?? reportDirect.createdAt ?? '';
+      if (!raw) return false;
+      const d = new Date(raw);
+      return d.getFullYear() === filterYear && d.getMonth() === filterMonth;
+    });
+  }, [filterYear, filterMonth]);
+
   const switchTab = (tab: 'reports' | 'tickets' | 'me') => {
     setActiveTab(tab);
     Animated.timing(tabAnim, {
@@ -278,13 +320,15 @@ export default function HomeScreen() {
   }, [refetch]);
 
   const filteredData = useMemo(() => {
+    let data: any[];
     switch (activeTab) {
-      case 'reports': return standaloneReports;
-      case 'tickets': return allTickets;
-      case 'me':      return [...draftItems, ...myReports.filter((r: any) => !r.ticket_id), ...myTickets];
-      default:        return [];
+      case 'reports': data = standaloneReports; break;
+      case 'tickets': data = allTickets; break;
+      case 'me':      data = [...draftItems, ...myReports.filter((r: any) => !r.ticket_id), ...myTickets]; break;
+      default:        data = []; break;
     }
-  }, [activeTab, standaloneReports, allTickets, myReports, myTickets, draftItems]);
+    return getFilteredByMonth(data);
+  }, [activeTab, standaloneReports, allTickets, myReports, myTickets, draftItems, getFilteredByMonth]);
 
   // ─── Delete a draft by its local_id ─────────────────────────────────────────
   const handleDeleteDraft = useCallback(async (draftId: string) => {
@@ -301,26 +345,132 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screen}>
+      <View style={styles.header}>
+        <View style={styles.tabBar}>
+          {(['reports', 'tickets', 'me'] as const).map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => switchTab(tab)}
+            >
+              <Ionicons
+                name={tab === 'reports' ? 'document-text' : tab === 'tickets' ? 'ticket' : 'person'}
+                size={16}
+                color={activeTab === tab ? '#fff' : '#74A5A8'}
+              />
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {/* Tab bar */}
-      <View style={styles.tabBar}>
-        {(['reports', 'tickets', 'me'] as const).map(tab => (
+        <View style={styles.calendarWrap}>
           <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => switchTab(tab)}
+            style={[styles.calendarBtn, filterActive && styles.calendarBtnActive]}
+            onPress={() => setShowMonthPicker(prev => !prev)}
           >
-            <Ionicons
-              name={tab === 'reports' ? 'document-text' : tab === 'tickets' ? 'ticket' : 'person'}
-              size={16}
-              color={activeTab === tab ? '#fff' : '#74A5A8'}
-            />
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#2a2a2a" />
+            <Ionicons name="chevron-down" size={12} color="#999" style={{ marginLeft: -6, marginBottom: 2 }} />
           </TouchableOpacity>
-        ))}
+          {filterActive && <View style={styles.filterDot} />}
+        </View>
       </View>
+
+      {/* ── Month picker dropdown ── */}
+      {showMonthPicker && (
+        <Modal
+          visible={showMonthPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowMonthPicker(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowMonthPicker(false)}>
+            <View style={styles.pickerOverlay}>
+              <View
+                style={[
+                  styles.monthPickerCard,
+                  Platform.OS === 'web' ? { position: 'fixed', top: pickerOpenTop, right: 16, zIndex: 9999 } : { top: pickerOpenTop, right: 16 },
+                ]}
+              >
+                {/* Year navigator */}
+                <View style={styles.monthPickerHeader}>
+                  <TouchableOpacity
+                    onPress={() => setFilterYear(y => y - 1)}
+                    style={styles.yrNavBtn}
+                  >
+                    <Ionicons name="chevron-back" size={22} color="#2a2a2a" />
+                  </TouchableOpacity>
+                  <Text style={styles.yrLabel}>{filterYear}</Text>
+                  <TouchableOpacity
+                    onPress={() => setFilterYear(y => y + 1)}
+                    style={styles.yrNavBtn}
+                  >
+                    <Ionicons name="chevron-forward" size={22} color="#2a2a2a" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Month grid */}
+                <FlatList
+                  data={monthNames}
+                  keyExtractor={(_, i) => i.toString()}
+                  numColumns={4}
+                  contentContainerStyle={styles.monthGrid}
+                  columnWrapperStyle={styles.monthRow}
+                  renderItem={({ item, index }) => {
+                    return (
+                      <TouchableOpacity
+                        style={[
+                          styles.monthCell,
+                          filterYear === now.getFullYear() && index === now.getMonth()
+                            ? styles.monthCellNow
+                            : index === filterMonth
+                              ? styles.monthCellSelected
+                              : null,
+                        ]}
+                        onPress={() => {
+                          setFilterYear(filterYear);
+                          setFilterMonth(index);
+                          setShowMonthPicker(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.monthCellText,
+                            filterYear === now.getFullYear() && index === now.getMonth()
+                              ? styles.monthCellTextNow
+                              : index === filterMonth
+                                ? styles.monthCellTextSelected
+                                : null,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.substring(0, 3)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+
+                {/* Quick actions */}
+                <View style={styles.monthPickerActions}>
+                  <TouchableOpacity
+                    style={styles.thisMonthBtn}
+                    onPress={() => {
+                      setFilterYear(now.getFullYear());
+                      setFilterMonth(now.getMonth());
+                      setShowMonthPicker(false);
+                    }}
+                  >
+                    <Text style={styles.thisMonthText}>This Month</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
+
 
       {error && !filteredData.length
         ? <View style={styles.errorBanner}>
@@ -467,13 +617,21 @@ const styles = StyleSheet.create({
     paddingBottom: 110,
   },
 
-  // ── Tab bar ───────────────────────────────────────
-  tabBar: {
+  // ── Header row: tabs (left) + calendar (right) ─
+  header: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+
+  // ── Tab bar (fills available space) ─────────────
+  tabBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   tab: {
@@ -777,5 +935,128 @@ const styles = StyleSheet.create({
     color: '#aaa',
     fontSize: 15,
     marginTop: 14,
+  },
+
+  // ── Calendar button & indicator ───────────────────
+  calendarBtn: {
+    width: 38,
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 19,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.65)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(116,165,168,0.35)',
+  },
+  calendarBtnActive: {
+    backgroundColor: 'rgba(116,165,168,0.18)',
+    borderColor: '#74A5A8',
+  },
+  calendarWrap: {
+    position: 'relative',
+  },
+  filterDot: {
+    position: 'absolute',
+    top: 1,
+    right: 2,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#74A5A8',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+
+  // ── Month picker drop-down ───────────────────────
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.00)',
+  },
+  monthPickerCard: {
+    position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+    top: 64,
+    right: 16,
+    width: 296,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingTop: 16,
+    paddingBottom: 14,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 14,
+  },
+  monthPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  yrLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  yrNavBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(116,165,168,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monthGrid: { paddingHorizontal: 2 },
+  monthRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  monthCell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginHorizontal: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(116,165,168,0.10)',
+  },
+  monthCellNow: {
+    backgroundColor: '#74A5A8',
+  },
+  monthCellSelected: {
+    backgroundColor: '#9BBBD0',
+  },
+  monthCellText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2a2a2a',
+  },
+  monthCellTextNow: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  monthCellTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  monthPickerActions: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 12,
+  },
+  thisMonthBtn: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(116,165,168,0.15)',
+  },
+  thisMonthText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#74A5A8',
   },
 });

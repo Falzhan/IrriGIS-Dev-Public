@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getPresetsByCategory, getReportPresets, getNearbyGISFeatures, getReportById, updateReport } from '../../services/api';
-import { getPendingReports, savePendingReport, deletePendingReport } from '../../services/offlineStorage';
+import { getPendingReports, savePendingReport, deletePendingReport, getCachedMapLayers, migrateCache } from '../../services/offlineStorage';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { useSheet } from '../../context/SheetContext';
 import DraggableBottomSheet from '../../components/DraggableBottomSheet';
@@ -110,11 +110,19 @@ export default function CameraScreen() {
 
   useEffect(() => {
     (async () => {
-      if (!permission?.granted) await requestPermission();
-      if (!micPermission?.granted) await requestMicPermission();
-      await getLocation();
-      await loadAllPresets();
-    })();
+      try {
+        // migrate stale null-sentinels from previous write path first
+        await migrateCache();
+      } catch { /* non-fatal */ }
+      try {
+        if (!permission?.granted) await requestPermission();
+        if (!micPermission?.granted) await requestMicPermission();
+        await getLocation();
+      } catch (_) { /* permissions / location denied — non-fatal at lint */ }
+      try {
+        await loadAllPresets();
+      } catch (_) { /* non-fatal */ }
+    })().catch(() => { /* top-level absorb to prevent HMR noise */ });
   }, []);
 
   // ─── Resume Draft from Me tab ────────────────────────────────────────────────
@@ -163,7 +171,6 @@ export default function CameraScreen() {
   const loadEditReport = useCallback(async (reportId: string) => {
     setIsEditing(false);
     setEditingReportId(null);
-    setEditDraftId(null);
     try {
       const response = await getReportById(reportId);
       const r: any = response.data?.data || response.data;
@@ -362,57 +369,96 @@ export default function CameraScreen() {
 
   const fetchNearbyFeatures = async () => {
     if (!location) return;
-    
+
     try {
       setFeaturesLoading(true);
-      
-      // Progressive search: try 200m, then 500m, then 1000m
+
+      // Progressive search: try 200 m, then 500 m, then 1 000 m
       const searchRadii = [200, 500, 1000];
-      let features = [];
+      let features: any[] = [];
       let finalRadius = 200;
-      
+
+      // ── Phase 1: online API with graceful per-radius degradation ──
       for (const radius of searchRadii) {
-        console.log(`Searching with radius: ${radius}m`);
-        const response = await getNearbyGISFeatures(location.latitude, location.longitude, radius);
-        
-        // Debug: Log the actual response structure
-        console.log(`API Response for ${radius}m:`, JSON.stringify(response, null, 2));
-        
-        let currentFeatures = [];
-        // Backend returns GeoJSON FeatureCollection format
-        if (response.data?.type === 'FeatureCollection' && Array.isArray(response.data.features)) {
-          currentFeatures = response.data.features;
-          console.log(`Found ${currentFeatures.length} features via FeatureCollection with ${radius}m radius`);
-        } else if (Array.isArray(response.data)) {
-          currentFeatures = response.data;
-          console.log(`Found ${currentFeatures.length} features via direct array with ${radius}m radius`);
-        } else if (Array.isArray(response.data?.data)) {
-          currentFeatures = response.data.data;
-          console.log(`Found ${currentFeatures.length} features via data.data with ${radius}m radius`);
-        }
-        
-        if (currentFeatures.length > 0) {
-          features = currentFeatures;
-          finalRadius = radius;
-          console.log(`Using features from ${radius}m search radius`);
-          break;
+        try {
+          const response = await getNearbyGISFeatures(location.latitude, location.longitude, radius);
+          let currentFeatures: any[] = [];
+          if (response.data?.type === 'FeatureCollection' && Array.isArray(response.data.features)) {
+            currentFeatures = response.data.features;
+          } else if (Array.isArray(response.data)) {
+            currentFeatures = response.data;
+          } else if (Array.isArray(response.data?.data)) {
+            currentFeatures = response.data.data;
+          }
+          if (currentFeatures.length > 0) {
+            features = currentFeatures;
+            finalRadius = radius;
+            break;
+          }
+        } catch {
+          // Network failed for this radius — try the next larger radius immediately
+          continue;
         }
       }
-      
+
+      // ── Phase 2: offline fallback — only when API returned nothing at all radii ──
       if (features.length === 0) {
-        console.log('No features found in any search radius');
+        try {
+          console.log('[Camera] offline fallback — reading cached map layers…');
+          const cached = await getCachedMapLayers();
+
+          // Normalise: cached.gisFeatures can be null, an array, a
+          // FeatureCollection, or an envelope { data: [...] } from the
+          // shared cache reader — whichever shape is on disk is handled here.
+          const raw = cached.gisFeatures;
+          const allFeatures: any[] = Array.isArray(raw)
+            ? raw
+            : (raw && Array.isArray(raw.features)
+              ? raw.features
+              : (raw && Array.isArray(raw?.data)
+                ? raw.data
+                : []));
+
+          console.log('[Camera] cached gisFeatures raw type:', typeof raw, 'normalised count:', allFeatures.length);
+          if (allFeatures.length > 0) {
+            for (const radius of searchRadii) {
+              const candidates = allFeatures.filter((feat: any) => {
+                const d = pointToLineDistance(location.latitude, location.longitude, feat.geometry);
+                return d <= radius;
+              });
+              if (candidates.length > 0) {
+                features = candidates;
+                finalRadius = radius;
+                break;
+              }
+            }
+            if (features.length === 0) {
+              features = allFeatures
+                .map((feat: any) => ({
+                  feature: feat,
+                  dist: pointToLineDistance(location.latitude, location.longitude, feat.geometry),
+                }))
+                .sort((a: any, b: any) => a.dist - b.dist)
+                .slice(0, 50)
+                .map((x: any) => x.feature);
+            }
+          }
+        } catch { /* cache miss — no offline data available */ }
+      }
+
+      if (features.length === 0) {
         setNearbyFeatures([]);
         setSelectedFeature(null);
         setFeaturesLoading(false);
         return;
       }
-      
+
       // Calculate proper point-to-line distance using geometry coordinates
       const featuresWithDistance = features.map((feature: any) => {
         const lineDistance = pointToLineDistance(
           location.latitude,
           location.longitude,
-          feature.geometry
+          feature.geometry,
         );
         return {
           ...feature,
@@ -427,18 +473,12 @@ export default function CameraScreen() {
       const sortedFeatures = featuresWithDistance.sort((a: any, b: any) => {
         return a.properties.distance - b.properties.distance;
       });
-      
-      console.log('Sorted features:', sortedFeatures.map((f: any) => ({
-        name: f.properties?.name,
-        distance: f.properties?.distance.toFixed(1) + 'm',
-        type: f.properties?.feature_type,
-      })));
+
       setNearbyFeatures(sortedFeatures);
-      
+
       // Auto-select the nearest feature
       if (sortedFeatures.length > 0) {
         setSelectedFeature(sortedFeatures[0]);
-        console.log(`Auto-selected nearest feature: ${sortedFeatures[0].properties?.name} at ${sortedFeatures[0].properties?.distance.toFixed(1)}m (search radius: ${finalRadius}m)`);
       }
     } catch (error) {
       console.error('Error fetching nearby features:', error);
@@ -640,7 +680,6 @@ function resetFormAfterSubmit() {
   setRemarks('');
   setSelectedFeature(null);
   setCurrentDraftId(null);
-  setEditDraftId(null);
   setIsEditing(false);
   setEditingReportId(null);
   setSubmissionType('report');

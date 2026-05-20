@@ -8,8 +8,8 @@ import { getMyReports } from '../../services/api';
 
 const LEVEL_DESCRIPTIONS: Record<string, Record<string, string>> = {
   water: { dry: 'No water', low: 'Minimal water', normal: 'Adequate water', high: 'Above normal', overflow: 'Flooding' },
-  silt: { clean: 'No silt', light: 'Light silt', normal: 'Moderate silt', dirty: 'Heavy silt', heavily_silted: 'Fully silted' },
-  debris: { clear: 'No obstruction', light: 'Minor debris', normal: 'Some debris', heavy: 'Heavy debris', blocked: 'Fully blocked' },
+  silt: { clean: 'No silt · Clean', light: 'Light silt', dirty: 'Heavy silt', heavily_silted: 'Fully silted' },
+  debris: { clear: 'No obstruction · Clear', light: 'Minor debris', heavy: 'Heavy debris', blocked: 'Fully blocked' },
 };
 
 const getLevelDescription = (level: string, type: 'water' | 'silt' | 'debris'): string => {
