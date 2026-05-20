@@ -5,7 +5,7 @@ import { Text, Button, ActivityIndicator, Divider, Avatar } from 'react-native-p
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getReportById } from '../../../services/api';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import MapView, { Marker } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import DetailTopBar from '../../../components/DetailTopBar';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -280,21 +280,32 @@ return (
           Location Map
         </Text>
         <View style={styles.mapContainer}>
-          <MapView
+          <WebView
+            source={{ html: `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+                <style> html, body { margin: 0; padding: 0; height: 100%; } #map { height: 100%; width: 100%; } </style>
+              </head>
+              <body>
+                <div id="map"></div>
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+                <script>
+                  var map = L.map('map').setView([${coords.latitude}, ${coords.longitude}], 15);
+                  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+                  L.marker([${coords.latitude}, ${coords.longitude}]).addTo(map)
+                    .bindPopup('${report.location_name || 'Report Location'}')
+                    .openPopup();
+                </script>
+              </body>
+              </html>
+            ` }}
             style={styles.map}
-            initialRegion={{
-              latitude: coords.latitude,
-              longitude: coords.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-          >
-            <Marker
-              coordinate={coords}
-              title={report.location_name || 'Report Location'}
-              description={report.category?.charAt(0).toUpperCase() + report.category?.slice(1)}
-            />
-          </MapView>
+            javaScriptEnabled
+            domStorageEnabled
+          />
         </View>
       </View>
 
