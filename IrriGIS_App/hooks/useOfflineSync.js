@@ -16,7 +16,9 @@ import {
   cacheData,
   getCachedItem,
   setLastSyncTime,
-  getLastSyncTime
+  getLastSyncTime,
+  writeJsonFile,
+  FILES
 } from '../services/offlineStorage';
 
 export function useOfflineSync() {
@@ -68,21 +70,47 @@ export function useOfflineSync() {
     
     setIsSyncing(true);
     const pendingReports = await getPendingReports();
+
+    // ─── Safety net: deduplicate by image URI before syncing ─────────────────────
+    // Removes duplicate entries that share the same image, keeping only the most
+    // recently created one. This prevents old duplicate drafts (from buggy runs
+    // where capturePhoto + createReportOffline both wrote a draft) from being
+    // submitted again as separate reports.
+    const seenUris = new Set();
+    const deduped = [];
+    for (let i = pendingReports.length - 1; i >= 0; i--) {
+      const report = pendingReports[i];
+      const primaryUri = report.images?.[0];
+      if (primaryUri && seenUris.has(primaryUri)) continue;
+      if (primaryUri) seenUris.add(primaryUri);
+      deduped.push(report);
+    }
+    // If we dropped any duplicates, persist the cleaned list immediately
+    if (deduped.length < pendingReports.length) {
+      await writeJsonFile(FILES.PENDING_REPORTS, deduped);
+      console.log('[Sync] Deduped pending list: ' + pendingReports.length + ' → ' + deduped.length + ' entries (removed ' + (pendingReports.length - deduped.length) + ' duplicates)');
+    }
+    const reportsToSync = deduped;
+
     let syncedCount = 0;
     let failedCount = 0;
     
-    for (const report of pendingReports) {
+    for (const report of reportsToSync) {
       try {
         const formData = new FormData();
         
         if (report.images && report.images.length > 0) {
-          report.images.forEach((imageUri: string, index: number) => {
+          report.images.forEach((imageUri, index) => {
             formData.append('images', {
               uri: imageUri,
               type: 'image/jpeg',
               name: `photo_${index}.jpg`,
             });
           });
+        }
+        
+        if (report.createdAt) {
+          formData.append('created_at', report.createdAt);
         }
         
         formData.append('water_level', String(report.water_level));

@@ -108,6 +108,11 @@ export default function CameraScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingReportId, setEditingReportId] = useState<string | null>(null);
 
+  // ─── Capture timestamp — reliable across cold restarts ───────────────────────
+  // kept as a ref so the value is always available synchronously in render
+  // (unlike setState, which resolves after the paint cycle)
+  const capturedAtRef = useRef<string | null>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -153,8 +158,38 @@ export default function CameraScreen() {
           setDebrisLevel(ds);
           setCategory(found.category || 'inspection');
           setRemarks(found.remarks || '');
+          
+          // ─── Restore saved location & location name (capture-time coords) ────────
+          if (typeof found.latitude === 'number' && typeof found.longitude === 'number') {
+            setLocation({ latitude: found.latitude, longitude: found.longitude });
+          }
+          if (typeof found.location_name === 'string') {
+            setLocationName(found.location_name);
+          }
+
+          // ─── Restore the captured-at date/time (comes from savePendingReport's createdAt) ──
+          // capturedAtRef is a useRef so this snapshot is immediately available to
+          // getCaptureDate/getCaptureTime without waiting for a re-paint.
+          if (typeof found.createdAt === 'string') {
+            capturedAtRef.current = found.createdAt;
+          }
           if (user?.ia_id) setSubmissionType(found.category === 'issue' ? 'ticket' : 'report');
-          if (found.gis_feature_id) {
+          
+          // ─── Reconstruct the selected canal from the SNAPSHOT of nearby features
+          // that was saved at capture time.  Using the fresh nearbyFeatures (current GPS)
+          // here would make re-opening a field draft from the office pick up the wrong
+          // nearest canal.
+          if (found.gis_feature_id && Array.isArray(found.nearby_features)) {
+            const archived = found.nearby_features;
+            const cachedName = found.selected_feature?.properties?.name;
+            const match = archived.find((f: any) =>
+              f.id === found.gis_feature_id ||
+              (cachedName && f.properties?.name === cachedName)
+            );
+            (setNearbyFeatures as any)(archived);
+            (setSelectedFeature as any)(match || null);
+          } else if (found.gis_feature_id) {
+            // Fallback: try the currently loaded features if the archived list is absent
             const features = nearbyFeatures as any[];
             (setSelectedFeature as any)(features.find((f: any) => f.id === found.gis_feature_id) || null);
           }
@@ -274,6 +309,12 @@ export default function CameraScreen() {
   };
 
   const getLocation = async () => {
+    // If location was already set (e.g. restored from a saved draft), keep it.
+    // This MUST come before location and locationName are read below so those
+    // captured-at-time values are available to downstream code (resume logic).
+    if (location !== null && location !== undefined) {
+      return;
+    }
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -544,6 +585,9 @@ export default function CameraScreen() {
         }
         const draftId = `local_${Date.now()}`;
         setCurrentDraftId(draftId);
+        // Pin the capture moment (ISO timestamp) to a ref so the form's
+        // date/time display is instant and survives cold app restarts.
+        capturedAtRef.current = new Date().toISOString();
         const reportData = {
           id: draftId,
           images: [photo.uri],
@@ -557,6 +601,11 @@ export default function CameraScreen() {
           location_name: locationName,
           ...(user?.ia_id && { ia_id: user.ia_id }),
           gis_feature_id: selectedFeature?.id || null,
+          captured_at: capturedAtRef.current,
+          // freeze nearby canals at capture time so draft re-opening uses
+          // the same location-aware feature list, not the device's current GPS
+          nearby_features: nearbyFeatures.map(f => ({ ...f })),
+          selected_feature: selectedFeature ? { ...selectedFeature } : null,
         };
         await savePendingReport(reportData);
       }
@@ -679,6 +728,7 @@ function resetFormAfterSubmit() {
   setCategory('inspection');
   setRemarks('');
   setSelectedFeature(null);
+  setNearbyFeatures([]);
   setCurrentDraftId(null);
   setIsEditing(false);
   setEditingReportId(null);
@@ -728,7 +778,12 @@ function resetFormAfterSubmit() {
         }
         Alert.alert('Success', 'Report submitted successfully!');
       } else {
-        // ─── Offline → draft stays, no action needed ──────────────────────────────
+        // ─── Offline → remove the auto-saved draft (capturePhoto already saved Draft A),
+        // ─── then keep only the Draft B just created by createReportOffline ────────
+        if (currentDraftId) {
+          try { await deletePendingReport(currentDraftId); } catch (_) {}
+          setCurrentDraftId(null);
+        }
         Alert.alert('Saved Offline', `Report saved locally. ${pendingCount + 1} pending report(s). Will sync when online.`);
       }
 
@@ -843,14 +898,19 @@ function resetFormAfterSubmit() {
     );
   };
 
-  const formatDate = () => {
-    const now = new Date();
-    return now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // ─── Capture-time date helpers (used on the form location card) ───────────────
+  // Uses capturedAtRef so the form always displays the moment the photo was taken,
+  // not the current time.  Falls back to now when not yet captured.
+  const getCaptureDate = () => {
+    const ts = capturedAtRef.current;
+    const d = ts ? new Date(ts) : new Date();
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const formatTime = () => {
-    const now = new Date();
-    return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const getCaptureTime = () => {
+    const ts = capturedAtRef.current;
+    const d = ts ? new Date(ts) : new Date();
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
   if (!permission) {
@@ -915,7 +975,7 @@ function resetFormAfterSubmit() {
             <View style={styles.watermarkContent}>
               <Ionicons name="location-sharp" size={12} color="#fff" />
               <RNText style={styles.watermarkText}>
-                {formatDate()} {formatTime()}
+                {getCaptureDate()} {getCaptureTime()}
               </RNText>
             </View>
             {locationName ? (
@@ -998,7 +1058,7 @@ function resetFormAfterSubmit() {
               </RNText>
             </View>
             <RNText style={styles.locationCardText}>{locationName || 'Location loading...'}</RNText>
-            <RNText style={styles.locationCardDate}>{formatDate()} {formatTime()}</RNText>
+            <RNText style={styles.locationCardDate}>{getCaptureDate()} {getCaptureTime()}</RNText>
             
             {/* GIS Feature (Canal) Information */}
             {selectedFeature ? (

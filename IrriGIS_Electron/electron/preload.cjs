@@ -1,3 +1,4 @@
+﻿// electron/preload.cjs
 const { contextBridge, ipcRenderer } = require('electron')
 
 // Expose protected methods that allow the renderer process to use
@@ -19,6 +20,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('window-state-changed', (event, state) => callback(state))
   },
   
+  // OAuth callback listener
+  onOAuthCallback: (callback) => {
+    const handler = (_event, data) => callback(data)
+    ipcRenderer.on('oauth-callback', handler)
+    return () => ipcRenderer.removeListener('oauth-callback', handler)
+  },
+  
   // Remove listeners
   removeAllListeners: (channel) => {
     ipcRenderer.removeAllListeners(channel)
@@ -27,3 +35,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 // Expose a flag to detect if running in Electron
 contextBridge.exposeInMainWorld('isElectron', true)
+

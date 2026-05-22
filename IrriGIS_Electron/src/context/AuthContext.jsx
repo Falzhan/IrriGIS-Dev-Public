@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 
 const AuthContext = createContext(null)
@@ -91,7 +92,23 @@ export function AuthProvider({ children }) {
           sessionStorage.removeItem('user')
         }
       }
-      setLoading(false)
+      setLoading(false);
+
+      // ── Post-reload: pick up data stashed by main.jsx pre-mount intercept ──
+      const pendingToken = localStorage.getItem('interceptedToken')
+      const pendingUserRaw  = localStorage.getItem('interceptedUser')
+      if (pendingToken && pendingUserRaw) {
+        localStorage.removeItem('interceptedToken')
+        localStorage.removeItem('interceptedUser')
+        try {
+          const userData = typeof pendingUserRaw === 'string'
+            ? JSON.parse(pendingUserRaw)
+            : pendingUserRaw
+          completeOAuthLogin(pendingToken, userData, true)
+        } catch {
+          // stale/corrupt; ignore
+        }
+      }
     }
 
     initAuth()
@@ -148,15 +165,26 @@ export function AuthProvider({ children }) {
   const completeOAuthLogin = useCallback((token, userData, rememberMe = true) => {
     const storageType = rememberMe ? 'local' : 'session'
     
-    if (rememberMe) {
-      localStorage.setItem('token', token)
-      localStorage.setItem('user', JSON.stringify(userData))
-    } else {
-      sessionStorage.setItem('token', token)
-      sessionStorage.setItem('user', JSON.stringify(userData))
+    // Normalize user data from OAuth callback to expected format
+    const normalizedUser = {
+      id: userData?.id || userData?.user?.id,
+      name: userData?.name || 
+            (userData?.first_name && userData?.last_name 
+              ? `${userData.first_name} ${userData.last_name}` 
+              : userData?.email?.split('@')[0] || 'Admin'),
+      email: userData?.email,
+      role: userData?.role || 'nia_admin'
     }
     
-    setUser(userData)
+    if (rememberMe) {
+      localStorage.setItem('token', token)
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
+    } else {
+      sessionStorage.setItem('token', token)
+      sessionStorage.setItem('user', JSON.stringify(normalizedUser))
+    }
+    
+    setUser(normalizedUser)
     setIsAuthenticated(true)
     startSessionCheck(token, storageType)
   }, [startSessionCheck])
@@ -211,6 +239,36 @@ export function AuthProvider({ children }) {
     setUser(null)
     setIsAuthenticated(false)
   }, [clearSessionCheck])
+
+  // ── Live OAuth callback from Electron main process ─────────────────────
+  // Placed below completeOAuthLogin / logout so they are initialised before
+  // being captured in the useEffect dependency arrays (avoids TDZ error).
+  useEffect(() => {
+    if (!window.electronAPI?.onOAuthCallback) return
+    const unsubscribe = window.electronAPI.onOAuthCallback(({ token, user, error }) => {
+      if (error) {
+        window.location.href = `/login?oauth_error=${encodeURIComponent(error)}&clear=1`
+        return
+      }
+      if (token && user) {
+        // user comes as URL-encoded JSON string, parse it
+        let userData = user
+        if (typeof user === 'string') {
+          try {
+            // Handle URL-encoded JSON string
+            let decoded = user
+            try { decoded = decodeURIComponent(user) } catch (_) {}
+            userData = JSON.parse(decoded)
+          } catch (e) {
+            return
+          }
+        }
+        completeOAuthLogin(token, userData, true)
+      }
+    })
+    return unsubscribe
+  }, [completeOAuthLogin])
+  // ─────────────────────────────────────────────────────────────────────
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, loading, completeOAuthLogin, refreshUser }}>

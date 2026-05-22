@@ -147,7 +147,19 @@ class ApiService {
 
     try {
       const response = await fetch(url, config)
-      const data = await response.json()
+      const contentType = response.headers.get('content-type') || ''
+      let data
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json()
+        } catch {
+          data = { message: 'Invalid JSON response from server' }
+        }
+      } else {
+        const text = await response.text()
+        console.error('[API] Non-JSON response from', endpoint, 'status:', response.status, 'content-type:', contentType, 'body (first 200):', text.substring(0, 200))
+        data = { message: `Server returned non-JSON response (${response.status} ${response.statusText}). The backend may be unreachable or misconfigured.` }
+      }
 
       if (response.status === 401) {
         localStorage.removeItem('token')
@@ -227,14 +239,27 @@ class ApiService {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers,
       body: formData,
     })
-    
-    const data = await response.json()
+
+    const contentType = response.headers.get('content-type') || ''
+    let data
+    if (contentType.includes('application/json')) {
+      try {
+        data = await response.json()
+      } catch {
+        data = { message: 'Invalid JSON response from server' }
+      }
+    } else {
+      const text = await response.text()
+      console.error('[API] Non-JSON response from POST /users:', response.status, text.substring(0, 200))
+      throw new Error(`Server returned ${response.status} ${response.statusText}. Expected JSON but got ${contentType || 'unknown type'}.`)
+    }
+
     if (!response.ok) {
       throw new Error(data.message || 'API request failed')
     }
